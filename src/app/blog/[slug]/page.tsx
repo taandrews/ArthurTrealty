@@ -40,7 +40,7 @@ export default async function ArticlePage({ params }: Props) {
             <Link href="/blog" className="font-heading font-bold text-navy" style={{ fontSize: '14px', display: 'inline-flex', alignItems: 'center', gap: '8px', textDecoration: 'none' }}>
               <ArrowLeft style={{ width: '16px', height: '16px' }} /> All resources
             </Link>
-            <GoldButton href="/quiz">See What You Qualify For</GoldButton>
+            <GoldButton href="/quiz">Find My First Step</GoldButton>
           </div>
         </div>
       </Section>

@@ -1,0 +1,19 @@
+{
+  "_about": "US 10DLC brand registration (US_TEN_DLC_BRAND_REGISTRATION). Fields marked TODO need the business owner's facts. The tax ID (EIN) is entered by the owner directly in the AWS console, never stored here.",
+  "fields": {
+    "companyInfo.companyName": "TODO: legal company name as registered with the state",
+    "companyInfo.taxIdIssuingCountry": "US",
+    "companyInfo.taxId": "ENTERED BY OWNER IN AWS CONSOLE",
+    "companyInfo.legalType": "PRIVATE_PROFIT (privately owned LLC or corporation; a sole proprietor uses a different AWS registration type)",
+    "companyInfo.address": "TODO: street address",
+    "companyInfo.city": "TODO",
+    "companyInfo.state": "MD",
+    "companyInfo.zipCode": "TODO",
+    "companyInfo.isoCountryCode": "US",
+    "contactInfo.dbaName": "Arthur T Realty",
+    "contactInfo.vertical": "REAL_ESTATE",
+    "contactInfo.website": "https://main.d3c5zstiegwi2m.amplifyapp.com",
+    "contactInfo.supportEmail": "TODO: real support email",
+    "contactInfo.supportPhoneNumber": "TODO: real support phone number"
+  }
+}

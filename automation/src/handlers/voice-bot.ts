@@ -65,6 +65,10 @@ export async function handler(event: LexV2Event): Promise<LexV2Result> {
     case 'follow_up':
       await notifyStaff(lead, 'Question to answer by text', [`Caller asked: "${utterance}"`, 'Please text them the answer. No call needed.']);
       return elicit(event, session, reply.say, lead);
+    case 'stop_calls':
+      await updateLead(lead.leadId, { callOptOut: true });
+      await logActivity({ leadId: lead.leadId, kind: 'note', channel: 'call', summary: 'Asked not to be called again' });
+      return close(event, session, reply.say, lead);
     case 'human':
       return handOff(event, session, lead, utterance, reply.say);
     case 'end':

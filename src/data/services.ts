@@ -41,7 +41,7 @@ export const SERVICES: ServicePage[] = [
     subtitle: 'We match first-time buyers with Maryland programs, down payment assistance, and the guidance to go from renting to owning with confidence.',
     image: HERO_IMAGES.keys,
     intro: [
-      'Buying your first home is one of the biggest decisions you will make, and it is easier with a guide. Your Arthur T Realty homeownership assistant walks you through every step by call and text, from checking your credit to getting your keys.',
+      'Buying your first home is one of the biggest decisions you will make, and it is easier with a guide. Your Arthur T Realty homeownership assistant walks you through every step by phone, from checking your credit to getting your keys.',
       'Maryland offers programs designed for first-time buyers, including the Maryland Mortgage Program (MMP) and county-level down payment assistance. Eligibility depends on factors like income, purchase price, and location. We help you find out which options fit you.',
     ],
     cardsTitle: 'Programs We Help You Explore',
@@ -108,7 +108,7 @@ export const SERVICES: ServicePage[] = [
     faqs: [
       { q: 'Is it online or in person?', a: 'Class format depends on the session. Your registration confirmation includes the location or meeting link.' },
       { q: 'What should I bring?', a: 'A notebook, a pen, and your questions. Your reminders will list anything else for your session.' },
-      { q: 'Will I get reminders?', a: 'Yes. Registered attendees get reminders by text and email before the class.' },
+      { q: 'Will I get reminders?', a: 'Yes. Registered attendees get reminders before the class.' },
     ],
     formTitle: 'Reserve Your Workshop Seat',
     heroCta: { label: 'Reserve Your Seat', href: '#get-started' },

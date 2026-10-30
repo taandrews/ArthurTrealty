@@ -120,7 +120,7 @@ export const resultTiers: Record<string, ResultTier> = {
     ],
     cta: 'See How It Works',
     ctaHref: '/#how-it-works',
-    timeline: 'What happens next: your homeownership assistant will call or text you with your first step.',
+    timeline: 'What happens next: your homeownership assistant will call you with your first step.',
   },
   building: {
     key: 'building',
@@ -139,7 +139,7 @@ export const resultTiers: Record<string, ResultTier> = {
     ],
     cta: 'See How It Works',
     ctaHref: '/#how-it-works',
-    timeline: 'What happens next: your homeownership assistant will call or text you with your first step.',
+    timeline: 'What happens next: your homeownership assistant will call you with your first step.',
   },
   fresh: {
     key: 'fresh',
@@ -158,7 +158,7 @@ export const resultTiers: Record<string, ResultTier> = {
     ],
     cta: 'See How It Works',
     ctaHref: '/#how-it-works',
-    timeline: 'What happens next: your homeownership assistant will call or text you with your first step.',
+    timeline: 'What happens next: your homeownership assistant will call you with your first step.',
   },
 };
 

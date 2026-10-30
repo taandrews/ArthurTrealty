@@ -110,6 +110,7 @@ function getVoiceSetup(): Promise<VoiceSetup | undefined> {
  */
 export async function placeCall(lead: Lead, script: string, label: string): Promise<Result> {
   if (!lead.phone) return skip(lead, 'call', label, 'no valid phone number');
+  if (lead.callOptOut) return skip(lead, 'call', label, 'client asked not to be called');
   let setup: VoiceSetup | undefined;
   try {
     setup = await getVoiceSetup();
@@ -119,13 +120,17 @@ export async function placeCall(lead: Lead, script: string, label: string): Prom
   if (!setup) return skip(lead, 'call', label, 'voice calling not set up yet');
   if (await deferIfQuietHours(lead, 'call', script, label)) return 'deferred';
 
+  // Every call says up front that it is an AI assistant.
+  const { assistantName, brandName } = getConfig();
+  const spoken = script.includes(assistantName) ? script : `This is ${assistantName} from ${brandName}. ${script}`;
+
   try {
     await connect.send(new StartOutboundVoiceContactCommand({
       InstanceId: setup.instanceId,
       ContactFlowId: setup.flowId,
       DestinationPhoneNumber: lead.phone,
       SourcePhoneNumber: setup.phoneNumber,
-      Attributes: { message: script, leadId: lead.leadId },
+      Attributes: { message: spoken, leadId: lead.leadId },
     }));
     await logActivity({ leadId: lead.leadId, kind: 'sent', channel: 'call', summary: `${label}: call placed` });
     return 'sent';

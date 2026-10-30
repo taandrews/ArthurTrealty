@@ -25,7 +25,7 @@ interface LeadDetail {
   workshop?: { at: string; location?: string; meetingLink?: string; whatToBring?: string };
   funds: Record<string, number | string | boolean | undefined>;
   tasks: Task[]; notes?: string; quiz?: Record<string, string>;
-  smsOptOut?: boolean; emailOptOut?: boolean;
+  smsOptOut?: boolean; emailOptOut?: boolean; callOptOut?: boolean;
 }
 interface Activity { at: string; kind: string; channel?: string; summary: string }
 type Kpis = Record<string, number | null | string | Record<string, number> | undefined>;
@@ -438,7 +438,7 @@ function LeadPanel({ leadId, api, onClose, onChanged }: { leadId: string; api: A
         {lead && (
           <div className="mt-5 space-y-6 font-body text-sm">
             <div className="grid grid-cols-2 gap-2 text-gray-700">
-              <div><span className="text-gray-400">Phone</span><br />{lead.phone ?? '—'}{lead.smsOptOut ? ' (texts off)' : ''}</div>
+              <div><span className="text-gray-400">Phone</span><br />{lead.phone ?? '—'}{[lead.callOptOut && 'calls off', lead.smsOptOut && 'texts off'].filter(Boolean).map((t) => ` (${t})`).join('')}</div>
               <div><span className="text-gray-400">Email</span><br />{lead.email ?? '—'}{lead.emailOptOut ? ' (unsubscribed)' : ''}</div>
               <div><span className="text-gray-400">Coordinator</span><br />{lead.assignedTo.name}</div>
               <div><span className="text-gray-400">Step / status</span><br /><span className="capitalize">{label(lead.phase)} · {label(lead.status)}</span></div>

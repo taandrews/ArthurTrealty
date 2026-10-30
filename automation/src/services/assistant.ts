@@ -8,7 +8,7 @@ import type { Lead } from '../types';
 const MODEL_ID = process.env.ASSISTANT_MODEL_ID ?? 'us.anthropic.claude-haiku-4-5-20251001-v1:0';
 const bedrock = new BedrockRuntimeClient({});
 
-export type AssistantAction = 'continue' | 'text_link' | 'start_questions' | 'follow_up' | 'human' | 'end';
+export type AssistantAction = 'continue' | 'text_link' | 'start_questions' | 'follow_up' | 'stop_calls' | 'human' | 'end';
 export interface AssistantReply { action: AssistantAction; say: string }
 export interface Turn { role: 'assistant' | 'caller'; text: string }
 export type Channel = 'call' | 'sms';
@@ -64,9 +64,10 @@ Respond with ONLY a JSON object: {"action": "...", "say": "..."}
 - "text_link": the client wants the link for their current step and it is available. "say" ${sms ? 'introduces the link (it is appended after your words)' : 'confirms you are sending it by text'}.
 - "start_questions": ONLY when the current step is planning for upfront costs and the client agrees (even just "yes" or "go ahead") to answer a few planning questions. Choose this right away; do not explain the costs first. "say" is a brief thank-you (the questions are asked separately).
 - "follow_up": the client asked something you cannot answer from what you know. "say" tells them the team will text them the answer${sms ? '' : ', then asks if there is anything else'}. Staff are asked to reply by text; this is not a phone call.
+- "stop_calls": the client asks you to stop calling them (or to take them off the call list). "say" confirms you will not call again${sms ? '' : ' and says goodbye'}.
 - "human": LAST RESORT ONLY. If the client asks for a person, first ask what they need and try to help with "continue". Use "human" only if they still insist after you offered to help, report a complaint or emergency, or need a decision only staff can make. "say" tells them ${lead.assignedTo.name} will reach out${sms ? '' : ' and says goodbye'}.
 - "end": the client is finished, declines, or says goodbye. "say" is a warm goodbye.
-${sms ? '' : '"human" and "end" hang up after "say", so their "say" must never ask a question. '}If the client asks for a link that is not available yet, use "continue": say it will be texted to them as soon as it is ready${sms ? '' : ', then ask if there is anything else'}.`;
+${sms ? '' : '"human", "stop_calls", and "end" hang up after "say", so their "say" must never ask a question. '}If the client asks for a link that is not available yet, use "continue": say it will be texted to them as soon as it is ready${sms ? '' : ', then ask if there is anything else'}.`;
 }
 
 export function parseReply(text: string): AssistantReply | undefined {
@@ -74,7 +75,7 @@ export function parseReply(text: string): AssistantReply | undefined {
   if (!match) return undefined;
   try {
     const obj = JSON.parse(match[0]) as Partial<AssistantReply>;
-    const actions: AssistantAction[] = ['continue', 'text_link', 'start_questions', 'follow_up', 'human', 'end'];
+    const actions: AssistantAction[] = ['continue', 'text_link', 'start_questions', 'follow_up', 'stop_calls', 'human', 'end'];
     if (!obj.action || !actions.includes(obj.action) || typeof obj.say !== 'string' || !obj.say.trim()) return undefined;
     return { action: obj.action, say: obj.say.trim() };
   } catch {

@@ -1,0 +1,31 @@
+{
+  "_about": "US 10DLC campaign registration for AWS End User Messaging (registration type US_TEN_DLC_CAMPAIGN_REGISTRATION). Field paths match `aws pinpoint-sms-voice-v2 describe-registration-field-definitions`. Submit after the brand registration (ten-dlc-brand.json) is approved.",
+  "fields": {
+    "campaignInfo.campaignName": "Arthur T Realty homeownership program: automated texts to Maryland clients who opted in on our website. Texts give each client their next program step (credit monitoring, mortgage application, Land Trust application, homeownership workshop, counseling), links to complete each step, appointment reminders, savings check-ins, and answers to their questions from our AI homeownership assistant.",
+    "campaignInfo.vertical": "REAL_ESTATE",
+    "campaignUseCase.useCase": "MIXED",
+    "campaignUseCase.subUseCases": ["ACCOUNT_NOTIFICATION", "CUSTOMER_CARE"],
+    "campaignUseCase.subscriberOptIn": "Yes",
+    "campaignUseCase.subscriberOptOut": "Yes",
+    "campaignUseCase.subscriberHelp": "Yes",
+    "campaignUseCase.directLending": "No",
+    "campaignUseCase.embeddedLink": "Yes",
+    "campaignUseCase.embeddedLinkSample": "https://main.d3c5zstiegwi2m.amplifyapp.com/workshops/",
+    "campaignUseCase.embeddedPhone": "No",
+    "campaignUseCase.ageGated": "No",
+    "campaignInfo.optInType": "DIGITAL_FORM",
+    "campaignInfo.optInWorkflow": "Clients opt in on our website (https://main.d3c5zstiegwi2m.amplifyapp.com/quiz/ and the form on each service page). The form collects name, phone, and email and has an unchecked checkbox the client must check before submitting, labeled: \"I agree to receive calls (including automated and AI-generated voice calls), texts, and emails from Arthur T Realty about real estate and homeownership services at the number and email provided. Message frequency varies. Message & data rates may apply. Reply STOP to opt out of texts or HELP for help. Consent is not a condition of purchase.\" The consent text, time, IP address, and browser are stored with each client record. SMS terms: https://main.d3c5zstiegwi2m.amplifyapp.com/sms-terms/",
+    "campaignInfo.termsAndConditionsLink": "https://main.d3c5zstiegwi2m.amplifyapp.com/sms-terms/",
+    "campaignInfo.privacyPolicyLink": "https://main.d3c5zstiegwi2m.amplifyapp.com/privacy/",
+    "campaignInfo.optInMessage": "Arthur T Realty: You're signed up for homeownership program texts. Msg frequency varies. Msg & data rates may apply. Reply HELP for help, STOP to opt out.",
+    "campaignInfo.helpMessage": "Arthur T Realty: your homeownership assistant. Text your question anytime and we'll help. Msg & data rates may apply. Reply STOP to opt out.",
+    "campaignInfo.stopMessage": "Arthur T Realty: You're unsubscribed and will receive no more texts. Reply START to resubscribe.",
+    "campaignCapabilities.numberCapabilities": "SMS and VOICE",
+    "campaignCapabilities.messageType": "Transactional",
+    "messageSamples.messageSample1": "Hi Dana! Welcome to Arthur T Realty. Your homeownership assistant will guide you through each step until you're ready to purchase your home. Text us any question anytime. Reply STOP to opt out.",
+    "messageSamples.messageSample2": "Step 1 of 5: Please activate your Smart Credit Monitoring account here: [program link]",
+    "messageSamples.messageSample3": "Hi Dana, a quick reminder. Step 2 of 5: complete your online mortgage application: [program link] Text us any question.",
+    "messageSamples.messageSample4": "Just checking in, Dana. Have you made progress toward your home buying funds? Reply UPDATE if anything has changed.",
+    "messageSamples.messageSample5": "Your Homeownership Workshop is Saturday at 10:00 AM. Where: online. Bring: a notebook and your questions. Text us any question."
+  }
+}

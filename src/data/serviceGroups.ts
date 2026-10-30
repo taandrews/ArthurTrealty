@@ -50,4 +50,4 @@ export const serviceGroups: ServiceGroup[] = [
   },
 ];
 
-export const QUIZ_LABEL = 'See What You Qualify For';
+export const QUIZ_LABEL = 'Find My First Step';

@@ -19,6 +19,7 @@ export function Navbar() {
   const [servicesOpen, setServicesOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const servicesRef = useRef<HTMLDivElement>(null);
+  const servicesButton = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 40);
@@ -29,7 +30,11 @@ export function Navbar() {
   // Escape or a click outside closes the Services menu.
   useEffect(() => {
     if (!servicesOpen) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setServicesOpen(false); };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      setServicesOpen(false);
+      servicesButton.current?.focus();
+    };
     const onClick = (e: MouseEvent) => {
       if (!servicesRef.current?.contains(e.target as Node)) setServicesOpen(false);
     };
@@ -63,7 +68,6 @@ export function Navbar() {
                 width: 'auto',
                 objectFit: 'contain',
                 display: 'block',
-                filter: 'contrast(1.3) saturate(1.2)',
               }}
             />
           </Link>
@@ -78,6 +82,7 @@ export function Navbar() {
               onMouseLeave={() => setServicesOpen(false)}
             >
               <button
+                ref={servicesButton}
                 type="button"
                 aria-expanded={servicesOpen}
                 aria-controls="services-menu"

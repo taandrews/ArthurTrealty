@@ -66,7 +66,7 @@ export default async function ServicePage({ params }: Props) {
             interest={page.slug}
             title={page.formTitle}
             submitLabel={page.submitLabel}
-            subtitle="Tell us a little about yourself and your homeownership assistant will call or text you with your next step."
+            subtitle="Tell us a little about yourself and your homeownership assistant will call you with your next step."
           />
         </div>
       </Section>

@@ -85,6 +85,7 @@ async function replyWithAssistant(lead: Lead, body: string): Promise<void> {
   const { link } = stepInfo(cfg, lead.phase);
   const text = reply.action === 'text_link' && link ? `${reply.say} ${link}` : reply.say;
   await sendSms(lead, text, 'Assistant reply', { immediate: true });
+  if (reply.action === 'stop_calls') await updateLead(lead.leadId, { callOptOut: true });
   if (reply.action === 'follow_up') await notifyStaff(lead, 'Question to answer by text', [`Client texted: "${body}"`, 'Please text them the answer. No call needed.']);
   if (reply.action === 'human') await notifyStaff(lead, 'Requests assistance (by text, after the assistant tried to help)', [`Client texted: "${body}"`]);
 }

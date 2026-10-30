@@ -19,7 +19,7 @@ export default function AboutPage() {
         <SectionHeading title="Our Mission" />
         <Prose paragraphs={[
           'Too many hardworking Maryland renters believe homeownership is out of reach because of their credit, their savings, or simply not knowing where to start. We believe there is a path for almost everyone, and that no one should have to walk it alone.',
-          'We combine homeownership programs, education, and credit guidance into one clear journey, and our AI homeownership assistant guides you through it by call and text, from your first question to the day you are ready to buy.',
+          'We combine homeownership programs, education, and credit guidance into one clear journey, and our AI homeownership assistant guides you through it by phone, from your first question to the day you are ready to buy.',
         ]} />
       </Section>
 
@@ -39,7 +39,7 @@ export default function AboutPage() {
         <SectionHeading title="How We Work" />
         <CheckList items={[
           'A clear five-step program: credit monitoring, mortgage application, Land Trust application, homeownership workshop, and one-on-one counseling',
-          'An AI homeownership assistant that calls and texts you with one clear next step at a time',
+          'An AI homeownership assistant that calls you with one clear next step at a time',
           'Shame-free guidance, whatever your credit or financial history',
           'Service across all 23 Maryland counties and Baltimore City',
         ]} />
@@ -48,7 +48,7 @@ export default function AboutPage() {
       <Section tone="navy">
         <div style={{ textAlign: 'center' }}>
           <SectionHeading center light title="Ready to Start?" intro="Take our free two-minute quiz to see which path fits you." />
-          <GoldButton href="/quiz">See What You Qualify For</GoldButton>
+          <GoldButton href="/quiz">Find My First Step</GoldButton>
         </div>
       </Section>
     </>

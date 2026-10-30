@@ -19,7 +19,7 @@ export function Container({ children, width = 1300 }: { children: React.ReactNod
 }
 
 export function PageHero({
-  eyebrow, title, subtitle, image = HERO_IMAGES.house, cta = { label: 'See What You Qualify For', href: '/quiz' },
+  eyebrow, title, subtitle, image = HERO_IMAGES.house, cta = { label: 'Find My First Step', href: '/quiz' },
 }: { eyebrow?: string; title: string; subtitle?: string; image?: string; cta?: { label: string; href: string } | false }) {
   return (
     <section className="relative overflow-hidden" style={{ paddingTop: '180px', paddingBottom: '96px' }}>

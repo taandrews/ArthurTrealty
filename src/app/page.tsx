@@ -1,29 +1,24 @@
 'use client';
 
-import { motion } from 'framer-motion';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ArrowRight, MessageSquare, PhoneCall, MapPin, Check, ChevronDown } from 'lucide-react';
+import { ArrowRight, PhoneCall, MapPin, Check, ChevronDown } from 'lucide-react';
 import { countyRegions } from '@/data/counties';
 import { serviceGroups, QUIZ_LABEL } from '@/data/serviceGroups';
-
-/* ——— Hero-only animation ——— */
-const fadeUp = {
-  hidden: { opacity: 0, y: 24 },
-  show: (d: number) => ({
-    opacity: 1, y: 0,
-    transition: { duration: 0.6, delay: d * 0.1, ease: [0.22, 1, 0.36, 1] as const },
-  }),
-};
 
 const gutter = { maxWidth: '1300px', margin: '0 auto', paddingLeft: 'clamp(24px, 5vw, 96px)', paddingRight: 'clamp(24px, 5vw, 96px)' };
 const sectionTitle = { fontSize: 'clamp(1.8rem, 4vw, 2.8rem)', marginBottom: '16px' };
 
 /* ——— How it works: the Home Buyer Journey in plain words ——— */
-const steps = [
+const inlineLink = { color: '#0A1F44', fontWeight: 600, textDecoration: 'underline', textUnderlineOffset: '3px', textDecorationColor: '#D4A017' } as const;
+
+const steps: { title: string; desc: React.ReactNode }[] = [
   { title: 'Take the 2-minute quiz', desc: 'Tell us where you are today. The quiz does not check your credit.' },
-  { title: 'Get your next step', desc: 'Our AI assistant calls or texts you with one clear step at a time, between 9am and 8pm.' },
-  { title: 'Complete your training', desc: 'A homeownership workshop and a one-on-one session with a Certified Homeownership Counselor.' },
+  { title: 'Get your next step', desc: 'Our AI assistant calls you with one clear step at a time, between 9am and 8pm.' },
+  {
+    title: 'Complete your training',
+    desc: <>A <Link href="/workshops" style={inlineLink}>homeownership workshop</Link> and a one-on-one session with a Certified Homeownership Counselor.</>,
+  },
   { title: 'Become mortgage-ready', desc: 'Credit, application, and savings plan in place, so you can start looking for your home.' },
 ];
 
@@ -33,6 +28,10 @@ const goldButton = {
   fontFamily: 'var(--font-heading)', fontWeight: 700, fontSize: '15px',
   borderRadius: '8px', textDecoration: 'none',
 } as const;
+
+// The homepage shows one or two links per goal; workshops and credit help are linked where they come up.
+const HOME_HIDDEN = new Set(['/renters-to-homeowners', '/workshops', '/credit-repair']);
+const doors = serviceGroups.map((g) => ({ ...g, links: g.links.filter((l) => !HOME_HIDDEN.has(l.href)) }));
 
 export default function HomePage() {
   return (
@@ -54,53 +53,48 @@ export default function HomePage() {
 
         <div className="relative z-10 w-full" style={{ ...gutter, paddingTop: '140px', paddingBottom: '80px' }}>
           <div style={{ maxWidth: '720px' }}>
-            <motion.div initial="hidden" animate="show">
-              <motion.h1
-                variants={fadeUp} custom={1}
-                className="font-heading font-extrabold text-white leading-[1.08]"
-                style={{ fontSize: 'clamp(2.6rem, 6vw, 4.5rem)', marginBottom: '24px' }}
-              >
-                Your Home Buying{' '}
-                <span className="text-gold">Specialist</span>
-              </motion.h1>
+            <h1
+              className="rise font-heading font-extrabold text-white leading-[1.08]"
+              style={{ fontSize: 'clamp(2.4rem, 5.5vw, 4.25rem)', marginBottom: '24px', animationDelay: '0.1s' }}
+            >
+              One clear step at a time, from{' '}
+              <span className="text-gold">renting to owning</span>
+            </h1>
 
-              <motion.p
-                variants={fadeUp} custom={2}
-                className="text-white/85 font-body leading-relaxed"
-                style={{ fontSize: 'clamp(16px, 2vw, 20px)', marginBottom: '40px', maxWidth: '560px' }}
-              >
-                Arthur T Realty connects Maryland renters with homeownership programs, down payment assistance, and expert guidance — no matter your credit situation.
-              </motion.p>
+            <p
+              className="rise text-white/85 font-body leading-relaxed"
+              style={{ fontSize: 'clamp(16px, 2vw, 20px)', marginBottom: '40px', maxWidth: '580px', animationDelay: '0.2s' }}
+            >
+              Arthur T Realty&rsquo;s AI homeownership assistant calls you with your next step and guides you to Maryland homeownership programs and down payment assistance, no matter your credit situation.
+            </p>
 
-              <motion.div variants={fadeUp} custom={3} className="flex flex-wrap" style={{ gap: '16px' }}>
-                <Link href="/quiz" style={goldButton}>
-                  {QUIZ_LABEL}
-                  <ArrowRight style={{ width: '16px', height: '16px' }} />
-                </Link>
-                <Link
-                  href="/contact"
-                  style={{
-                    ...goldButton, fontWeight: 600, background: 'rgba(255,255,255,0.1)', color: '#ffffff',
-                    border: '1px solid rgba(255,255,255,0.3)',
-                  }}
-                >
-                  <MessageSquare style={{ width: '16px', height: '16px' }} />
-                  Contact Us
-                </Link>
-              </motion.div>
-
-              <motion.ul
-                variants={fadeUp} custom={4}
-                className="flex flex-wrap font-body text-white/85"
-                style={{ gap: '8px 24px', marginTop: '24px', fontSize: '14px', listStyle: 'none' }}
+            <div className="rise flex flex-wrap" style={{ gap: '16px', animationDelay: '0.3s' }}>
+              <Link href="/quiz" style={goldButton}>
+                {QUIZ_LABEL}
+                <ArrowRight style={{ width: '16px', height: '16px' }} />
+              </Link>
+              <a
+                href="#how-it-works"
+                style={{
+                  ...goldButton, fontWeight: 600, background: 'rgba(255,255,255,0.1)', color: '#ffffff',
+                  border: '1px solid rgba(255,255,255,0.3)',
+                }}
               >
-                {['Free', 'About 2 minutes', 'No credit check'].map((t) => (
-                  <li key={t} className="flex items-center" style={{ gap: '8px' }}>
-                    <Check aria-hidden style={{ width: '16px', height: '16px', color: '#D4A017' }} /> {t}
-                  </li>
-                ))}
-              </motion.ul>
-            </motion.div>
+                See How It Works
+                <ChevronDown style={{ width: '16px', height: '16px' }} />
+              </a>
+            </div>
+
+            <ul
+              className="rise flex flex-wrap font-body text-white/85"
+              style={{ gap: '8px 24px', marginTop: '24px', fontSize: '14px', listStyle: 'none', animationDelay: '0.4s' }}
+            >
+              {['Free', 'About 2 minutes', 'No credit check'].map((t) => (
+                <li key={t} className="flex items-center" style={{ gap: '8px' }}>
+                  <Check aria-hidden style={{ width: '16px', height: '16px', color: '#D4A017' }} /> {t}
+                </li>
+              ))}
+            </ul>
           </div>
         </div>
       </section>
@@ -111,7 +105,7 @@ export default function HomePage() {
           <div style={{ maxWidth: '640px', marginBottom: '56px' }}>
             <h2 className="font-heading font-extrabold text-navy" style={sectionTitle}>How It Works</h2>
             <p className="text-gray-text font-body" style={{ fontSize: '17px', lineHeight: '1.6' }}>
-              Your AI assistant calls and texts you with one clear step at a time, so you always know what to do next.
+              Your AI assistant calls you with one clear step at a time, so you always know what to do next.
             </p>
           </div>
 
@@ -156,17 +150,11 @@ export default function HomePage() {
               <PhoneCall style={{ width: '36px', height: '36px', color: '#D4A017' }} />
             </div>
             <div style={{ flex: 1 }}>
-              <h3 className="font-heading text-white" style={{ fontSize: '22px', marginBottom: '8px' }}>Your homeownership assistant, on call and by text</h3>
+              <h3 className="font-heading text-white" style={{ fontSize: '22px', marginBottom: '8px' }}>Your homeownership assistant, on call</h3>
               <p className="font-body" style={{ fontSize: '16px', lineHeight: '1.6', color: 'rgba(255,255,255,0.85)', maxWidth: '60ch' }}>
-                It calls you with your next step, answers your questions about the program, and texts you links and reminders, so nothing slips through the cracks.
+                It calls you with your next step, answers your questions about the program, and keeps you on track. It always tells you it&rsquo;s an AI assistant, and you can tell it to stop calling anytime.
               </p>
             </div>
-            <Link
-              href="/quiz"
-              style={{ ...goldButton, flexShrink: 0 }}
-            >
-              {QUIZ_LABEL} <ArrowRight style={{ width: '16px', height: '16px' }} />
-            </Link>
           </div>
         </div>
       </section>
@@ -179,7 +167,7 @@ export default function HomePage() {
           </h2>
 
           <ul style={{ listStyle: 'none', borderTop: '1px solid #E2E4EA' }}>
-            {serviceGroups.map((group) => (
+            {doors.map((group) => (
               <li key={group.goal} className="door" style={{ borderBottom: '1px solid #E2E4EA', padding: '32px 0', display: 'grid', gap: '16px 48px' }}>
                 <div>
                   <h3 className="font-heading text-navy" style={{ fontSize: 'clamp(22px, 2.4vw, 28px)', marginBottom: '8px' }}>
@@ -224,12 +212,9 @@ export default function HomePage() {
             Good, bad, or no credit, there’s a first step.
           </h2>
           <div>
-            <p className="text-gray-text font-body" style={{ fontSize: '17px', lineHeight: '1.65', marginBottom: '28px', maxWidth: '60ch' }}>
-              You don’t need to know your score. The quiz asks a few simple questions, and we’ll suggest where to start: a homebuying program, credit help through licensed partners, or rent-to-own while you get ready.
+            <p className="text-gray-text font-body" style={{ fontSize: '17px', lineHeight: '1.65', maxWidth: '60ch' }}>
+              You don’t need to know your score. The quiz asks a few simple questions, and we’ll suggest where to start: a homebuying program, <Link href="/credit-repair" style={inlineLink}>credit help through licensed partners</Link>, or <Link href="/rent-to-own" style={inlineLink}>rent-to-own</Link> while you get ready.
             </p>
-            <Link href="/quiz" style={goldButton}>
-              {QUIZ_LABEL} <ArrowRight style={{ width: '16px', height: '16px' }} />
-            </Link>
           </div>
         </div>
       </section>
@@ -286,7 +271,7 @@ export default function HomePage() {
             Ready to Stop Renting?
           </h2>
           <p className="text-white/85 font-body" style={{ fontSize: '17px', lineHeight: '1.6', marginBottom: '40px' }}>
-            Take the first step. Our free quiz matches you with Maryland programs in under 2 minutes.
+            Take the first step. Our free quiz takes about 2 minutes and matches you with Maryland programs.
           </p>
           <Link href="/quiz" style={{ ...goldButton, padding: '18px 40px', fontSize: '16px', borderRadius: '10px' }}>
             {QUIZ_LABEL}

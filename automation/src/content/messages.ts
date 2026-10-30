@@ -37,12 +37,12 @@ export function welcome({ cfg, lead }: Ctx): Outreach {
       `complete your mortgage application, complete your Land Trust application, ` +
       `register for a Homeownership Workshop, meet one-on-one with a certified Homeownership Counselor, ` +
       `and prepare for purchasing your new home. ` +
-      `If at any time you have questions, our team is here to help. ` +
-      `Let's begin with your first step, which I'm sending you by text. Do you have any questions before we get started?`,
+      `If you have questions at any time, just ask me on any call. ` +
+      `Let's begin with your first step. Do you have any questions before we get started?`,
     sms:
       `Hi ${name}! Welcome to ${cfg.brandName}. We're excited to help you become a homeowner. ` +
-      `We'll guide you through each step until you're ready to purchase your home. ` +
-      `Reply HELP anytime if you need assistance.`,
+      `Your homeownership assistant will guide you through each step until you're ready to purchase your home. ` +
+      `Text us any question anytime. Reply STOP to opt out.`,
     email: {
       subject: `Welcome to ${cfg.brandName}, ${name}`,
       paragraphs: [
@@ -197,7 +197,7 @@ export function phaseReminder({ cfg, lead }: Ctx, phase: PhaseKey): Outreach {
   const name = lead.firstName;
   const { links, rules } = cfg;
   const nudge = (step: string, what: string, url: string, subject: string): Outreach => ({
-    sms: `Hi ${name}, a quick reminder. ${step}: ${what}: ${url} Reply HELP if you need assistance.`,
+    sms: `Hi ${name}, a quick reminder. ${step}: ${what}: ${url} Text us any question.`,
     email: {
       subject: `Reminder: ${subject}`,
       paragraphs: [
@@ -271,7 +271,7 @@ export function workshopReminder({ cfg, lead }: Ctx, label: string): Outreach {
   return {
     sms:
       `Reminder: your Homeownership Workshop is in ${label}. ` +
-      `${date} at ${time}. Where: ${where}. Bring: ${bring}. Reply HELP with questions.`,
+      `${date} at ${time}. Where: ${where}. Bring: ${bring}. Text us any question.`,
     email: {
       subject: `Your Homeownership Workshop is in ${label}`,
       paragraphs: [`Hi ${lead.firstName},`, 'Here are the details for your upcoming Homeownership Workshop:'],

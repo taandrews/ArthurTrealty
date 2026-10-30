@@ -19,7 +19,7 @@ const companyLinks = [
   { name: 'About', href: '/about' },
   { name: 'Blog', href: '/blog' },
   { name: 'Contact', href: '/contact' },
-  { name: 'Homeownership Quiz', href: '/quiz' },
+  { name: 'Find My First Step', href: '/quiz' },
 ];
 
 const legalLinks = [

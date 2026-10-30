@@ -106,5 +106,7 @@ export interface Lead {
   nurtureLastSentAt?: string;
   mortgageReadyAt?: string;
   smsOptOut?: boolean;
+  /** The client asked the assistant to stop calling. */
+  callOptOut?: boolean;
   emailOptOut?: boolean;
 }
