@@ -1,6 +1,6 @@
-# Zion Enterprises — Build Plan
+# Arthur T Realty — Build Plan
 
-**Project:** Lead generation demo website for Zion Enterprises (Maryland homeownership solutions)
+**Project:** Lead generation demo website for Arthur T Realty (Maryland homeownership solutions)
 **Purpose:** Client demo — functionality is visual only, no live AWS services
 **Tech Stack:** Next.js (React), Tailwind CSS, deployed via AWS Amplify
 **Built by:** Init One Solutions
@@ -145,11 +145,11 @@
 ### Page Titles
 | Page | Title |
 |------|-------|
-| Homepage | Zion Enterprises \| Maryland Homeownership Programs for Renters |
-| First-Time Buyer | Maryland First Time Home Buyer Programs & Down Payment Assistance \| Zion Enterprises |
-| Rent to Own | Rent to Own Homes in Maryland \| Zion Enterprises |
-| Renters to Homeowners | Buy a Home in Maryland With Good, Bad or No Credit \| Zion Enterprises |
-| Credit Repair | Credit Repair for Homebuyers in Maryland \| Zion Enterprises |
+| Homepage | Arthur T Realty \| Maryland Homeownership Programs for Renters |
+| First-Time Buyer | Maryland First Time Home Buyer Programs & Down Payment Assistance \| Arthur T Realty |
+| Rent to Own | Rent to Own Homes in Maryland \| Arthur T Realty |
+| Renters to Homeowners | Buy a Home in Maryland With Good, Bad or No Credit \| Arthur T Realty |
+| Credit Repair | Credit Repair for Homebuyers in Maryland \| Arthur T Realty |
 
 ---
 
@@ -183,7 +183,7 @@ The following are **not built** for the demo but are represented in the UI:
 ## File Structure (Target)
 
 ```
-zion-enterprises/
+arthur-t-realty/
 ├── public/
 │   ├── images/
 │   ├── pdfs/

@@ -22,7 +22,7 @@
 }
 
 /* ——— Base ——— */
-*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+/* Tailwind's preflight already zeroes margin and padding inside @layer base, so spacing utilities still apply. */
 
 html {
   scroll-behavior: smooth;
@@ -42,6 +42,34 @@ h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-heading);
   font-weight: 700;
   line-height: 1.15;
+}
+
+/* ——— Browser surfaces ——— */
+::selection { background: rgba(212, 160, 23, 0.35); color: var(--color-navy); }
+
+:where(a, button, summary, [tabindex]):focus-visible {
+  outline: 3px solid var(--color-gold);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+main:focus { outline: none; }
+
+.skip-link {
+  position: fixed; top: 12px; left: 12px; z-index: 100;
+  padding: 12px 20px; border-radius: 8px;
+  background: var(--color-navy); color: #fff;
+  font-family: var(--font-heading); font-weight: 700; font-size: 14px;
+  transform: translateY(-200%);
+}
+.skip-link:focus-visible { transform: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 /* ——— Hero gradient ——— */

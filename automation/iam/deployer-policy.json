@@ -1,0 +1,31 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "UseCdkBootstrapRoles",
+      "Effect": "Allow",
+      "Action": "sts:AssumeRole",
+      "Resource": "arn:aws:iam::*:role/cdk-hnb659fds-*"
+    },
+    {
+      "Sid": "ReadStackStatusAndOutputs",
+      "Effect": "Allow",
+      "Action": [
+        "cloudformation:DescribeStacks",
+        "cloudformation:DescribeStackEvents",
+        "cloudformation:GetTemplate"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "UploadWebsiteToAmplify",
+      "Effect": "Allow",
+      "Action": [
+        "amplify:CreateDeployment",
+        "amplify:StartDeployment",
+        "amplify:GetJob"
+      ],
+      "Resource": "arn:aws:amplify:us-east-2:811926871675:apps/*"
+    }
+  ]
+}

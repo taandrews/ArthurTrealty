@@ -1,4 +1,4 @@
-# Zion Enterprises — Project Rules
+# Arthur T Realty — Project Rules
 
 ## Dev Server
 - **Always use port 3100** for the Next.js dev server (`next dev -p 3100`)
@@ -6,7 +6,7 @@
 
 ## Tech Stack
 - Next.js with TypeScript, Tailwind CSS v4, Framer Motion, Lucide React
-- This is a **client demo** — backend functionality is mocked, not real
+- Hosted on AWS (S3 + CloudFront). Backend automation lives in `automation/` (AWS CDK) — see `automation/README.md`
 
 ## Brand
 - Colors: Navy `#0A1F44`, Gold `#D4A017`, White `#FFFFFF`, Light Gray `#F5F6FA`

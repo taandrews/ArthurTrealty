@@ -8,6 +8,8 @@ import {
 } from 'lucide-react';
 import { quizQuestions, getTierFromCredit, type ResultTier } from '@/data/quiz-questions';
 import { marylandCounties } from '@/data/counties';
+import { getRuntimeConfig } from '@/lib/runtime-config';
+import { CONSENT_TEXT } from '@/lib/consent';
 
 /* ——— Slide animation variants ——— */
 const slideVariants = {
@@ -71,7 +73,9 @@ export default function QuizPage() {
   const [step, setStep] = useState(0);
   const [direction, setDirection] = useState(1);
   const [answers, setAnswers] = useState<Record<string, string>>({});
-  const [leadForm, setLeadForm] = useState({ name: '', email: '', phone: '' });
+  const [leadForm, setLeadForm] = useState({ name: '', email: '', phone: '', company: '' });
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
   const [tcpaChecked, setTcpaChecked] = useState(false);
   const [result, setResult] = useState<ResultTier | null>(null);
   const [phase, setPhase] = useState<'quiz' | 'lead' | 'result'>('quiz');
@@ -110,14 +114,43 @@ export default function QuizPage() {
     setAnswers((prev) => ({ ...prev, [questionId]: value }));
   }, []);
 
-  const submitLead = useCallback(() => {
+  const submitLead = useCallback(async () => {
+    setSubmitting(true);
+    setSubmitError('');
+    try {
+      const { apiUrl } = await getRuntimeConfig();
+      const res = await fetch(`${apiUrl}/public/leads`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: leadForm.name,
+          email: leadForm.email,
+          phone: leadForm.phone,
+          company: leadForm.company,
+          answers,
+          consent: tcpaChecked,
+          consentText: CONSENT_TEXT,
+        }),
+      });
+      if (!res.ok) {
+        const { error } = await res.json().catch(() => ({ error: '' }));
+        throw new Error(error || 'Submission failed');
+      }
+    } catch (err) {
+      setSubmitError(err instanceof Error && err.message !== 'Failed to fetch'
+        ? err.message
+        : "We couldn't send your information. Please check your connection and try again.");
+      setSubmitting(false);
+      return;
+    }
+    setSubmitting(false);
     const tier = getTierFromCredit(answers.credit || '');
     setResult(tier);
     setDirection(1);
     setPhase('result');
-  }, [answers]);
+  }, [answers, leadForm, tcpaChecked]);
 
-  const isLeadValid = leadForm.name.trim() && leadForm.email.trim() && tcpaChecked;
+  const isLeadValid = leadForm.name.trim() && leadForm.email.trim() && tcpaChecked && !submitting;
 
   /* ——— Progress bar width ——— */
   const progressPct =
@@ -374,10 +407,27 @@ export default function QuizPage() {
                     fontFamily: 'var(--font-body)', fontSize: '12px', color: '#9ca3af',
                     lineHeight: 1.5,
                   }}>
-                    I agree to receive calls, texts, and emails from Arthur Jordan Realtor about homeownership programs.
-                    Message & data rates may apply. Consent is not a condition of purchase.
+                    {CONSENT_TEXT}
                   </span>
                 </label>
+
+                {/* Hidden from people; bots that fill it in are ignored */}
+                <input
+                  type="text"
+                  name="company"
+                  tabIndex={-1}
+                  autoComplete="off"
+                  aria-hidden="true"
+                  value={leadForm.company}
+                  onChange={(e) => setLeadForm((f) => ({ ...f, company: e.target.value }))}
+                  style={{ position: 'absolute', left: '-9999px', width: '1px', height: '1px', opacity: 0 }}
+                />
+
+                {submitError && (
+                  <p role="alert" style={{ fontFamily: 'var(--font-body)', fontSize: '14px', color: '#b91c1c', margin: 0 }}>
+                    {submitError}
+                  </p>
+                )}
               </div>
 
               {/* Form Buttons */}
@@ -410,7 +460,7 @@ export default function QuizPage() {
                     boxShadow: isLeadValid ? '0 8px 30px -6px rgba(212,160,23,0.35)' : 'none',
                   }}
                 >
-                  See My Results
+                  {submitting ? 'Sending…' : 'See My Results'}
                   <ArrowRight style={{ width: '16px', height: '16px' }} />
                 </button>
               </div>
@@ -507,11 +557,10 @@ export default function QuizPage() {
                         ))}
                       </ul>
 
-                      {/* Timeline */}
+                      {/* What happens next */}
                       <p style={{
-                        fontFamily: 'var(--font-body)', fontSize: '13px',
+                        fontFamily: 'var(--font-body)', fontSize: '15px', fontWeight: 600,
                         color: s.timelineText, marginBottom: '28px',
-                        fontStyle: 'italic',
                       }}>
                         {result.timeline}
                       </p>
@@ -543,7 +592,7 @@ export default function QuizPage() {
                   onClick={() => {
                     setStep(0);
                     setAnswers({});
-                    setLeadForm({ name: '', email: '', phone: '' });
+                    setLeadForm({ name: '', email: '', phone: '', company: '' });
                     setTcpaChecked(false);
                     setResult(null);
                     setDirection(-1);

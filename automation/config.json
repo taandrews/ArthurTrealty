@@ -1,0 +1,43 @@
+{
+  "brandName": "Arthur T Realty",
+  "assistantName": "your virtual homeownership assistant",
+  "timeZone": "America/New_York",
+  "mailingAddress": "TODO: business mailing address (required in marketing emails)",
+
+  "email": {
+    "enabled": false,
+    "from": "info@arthurtrealty.com",
+    "replyTo": "info@arthurtrealty.com"
+  },
+
+  "sms": {
+    "originationIdentity": ""
+  },
+
+  "voice": {
+    "voiceId": "Joanna"
+  },
+
+  "links": {
+    "smartCredit": "TODO: Smart Credit registration link",
+    "loanApplication": "TODO: online mortgage application link",
+    "landTrust": "TODO: Land Trust application link",
+    "workshop": "TODO: workshop registration link",
+    "counselingCalendar": "TODO: counseling calendar booking link"
+  },
+
+  "staff": [
+    { "name": "Arthur", "email": "", "phone": "" }
+  ],
+  "managerEmails": [],
+
+  "rules": {
+    "reminderEveryDays": 3,
+    "fundsFollowUpEveryDays": 14,
+    "inactivityAlertDays": 14,
+    "nurtureEveryDays": 7,
+    "upfrontCostsTarget": 1500,
+    "contactHoursStart": 9,
+    "contactHoursEnd": 20
+  }
+}

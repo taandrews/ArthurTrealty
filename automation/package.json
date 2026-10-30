@@ -1,0 +1,42 @@
+{
+  "name": "arthur-t-realty-automation",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AI home buyer nurture, qualification and mortgage-readiness automation on AWS",
+  "scripts": {
+    "build:site": "npm --prefix .. run build",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "synth": "cdk synth --profile arthurtrealty",
+    "deploy": "npm run build:site && cdk deploy --all --profile arthurtrealty --require-approval never --outputs-file cdk-outputs.json && tsx scripts/deploy-site.ts",
+    "deploy:site": "npm run build:site && tsx scripts/deploy-site.ts",
+    "diff": "cdk diff --profile arthurtrealty"
+  },
+  "dependencies": {
+    "@aws-sdk/client-amplify": "^3.1159.0",
+    "@aws-sdk/client-bedrock-runtime": "^3.1159.0",
+    "@aws-sdk/client-connect": "^3.700.0",
+    "@aws-sdk/client-dynamodb": "^3.700.0",
+    "@aws-sdk/client-pinpoint-sms-voice-v2": "^3.700.0",
+    "@aws-sdk/client-scheduler": "^3.700.0",
+    "@aws-sdk/client-secrets-manager": "^3.700.0",
+    "@aws-sdk/client-sesv2": "^3.700.0",
+    "@aws-sdk/client-sfn": "^3.700.0",
+    "@aws-sdk/client-sns": "^3.1159.0",
+    "@aws-sdk/client-ssm": "^3.1159.0",
+    "@aws-sdk/lib-dynamodb": "^3.700.0",
+    "adm-zip": "^0.5.16"
+  },
+  "devDependencies": {
+    "@types/adm-zip": "^0.5.7",
+    "@types/aws-lambda": "^8.10.145",
+    "@types/node": "^22.0.0",
+    "aws-cdk": "^2.1000.0",
+    "aws-cdk-lib": "^2.200.0",
+    "constructs": "^10.4.0",
+    "esbuild": "^0.25.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  }
+}
