@@ -1,8 +1,8 @@
-import { SFNClient, SendTaskSuccessCommand, StartExecutionCommand, StopExecutionCommand } from '@aws-sdk/client-sfn';
+import { SFNClient, SendTaskFailureCommand, SendTaskSuccessCommand, StartExecutionCommand, StopExecutionCommand } from '@aws-sdk/client-sfn';
 import { randomUUID } from 'node:crypto';
 import { env, getConfig } from '../config';
 import { WORKSHOP_REMINDERS } from '../content/messages';
-import { toE164 } from '../lib/phone';
+import { toE164, toUsPhone } from '../lib/phone';
 import { DAY_MS, nowIso } from '../lib/time';
 import { phaseFor } from '../phases';
 import type { Funds, Lead, LeadSource, MilestoneType, Staff, Workshop } from '../types';
@@ -46,8 +46,13 @@ export async function createLead(input: NewLeadInput): Promise<Lead> {
   const firstName = cleanName(input.firstName);
   if (!firstName) throw new BadRequestError('First name is required');
   const email = input.email?.trim().toLowerCase() || undefined;
-  const phone = toE164(input.phone);
-  if (!email && !phone) throw new BadRequestError('An email address or a valid US phone number is required');
+  // Numbers outside the US service area (other +1 countries, premium codes) are treated as no number.
+  const phone = toUsPhone(input.phone);
+  if (!email && !phone) {
+    throw new BadRequestError(toE164(input.phone)
+      ? 'Please enter a US mobile number'
+      : 'An email address or a valid US phone number is required');
+  }
 
   const staff = cfg.staff as Staff[];
   const assignedTo = staff[(await nextAssignmentIndex()) % staff.length];
@@ -91,19 +96,39 @@ export async function createLead(input: NewLeadInput): Promise<Lead> {
   await putNewLead(lead);
   await logActivity({ leadId, kind: 'note', summary: `Lead created from ${input.source}, assigned to ${assignedTo.name}` });
 
-  const exec = await sfn.send(new StartExecutionCommand({
-    stateMachineArn: env.stateMachineArn,
-    name: leadId,
-    input: JSON.stringify({ leadId }),
-  }));
-  const saved = await updateLead(leadId, { executionArn: exec.executionArn });
+  // The lead is saved either way; if the journey can't start, staff are told instead of losing the lead.
+  const executionArn = await startJourney(leadId);
+  const saved = executionArn ? await updateLead(leadId, { executionArn }) : lead;
+  if (!executionArn) {
+    await logActivity({ leadId, kind: 'note', summary: 'Journey could not be started (automated outreach is not running)' });
+    await notifyStaff(saved, 'Journey did not start', ['The lead was saved, but automated calls, texts, and emails are not running for them.']);
+  }
 
   await notifyStaff(saved, 'New lead assigned to you', [
     `Source: ${input.source}${input.sourceDetail ? ` (${input.sourceDetail})` : ''}`,
     'Tasks: personal introduction call within 24 hours; review progress in one week.',
     ...(input.notes ? [`Notes: ${input.notes}`] : []),
+    ...(input.consent ? [] : ['No consent on record: automated calls, texts, and emails will not go out to this client.']),
   ]);
   return saved;
+}
+
+/** Start the journey, retrying briefly. Same name + input is idempotent, so a retry can't start it twice. */
+async function startJourney(leadId: string): Promise<string | undefined> {
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const exec = await sfn.send(new StartExecutionCommand({
+        stateMachineArn: env.stateMachineArn,
+        name: leadId,
+        input: JSON.stringify({ leadId }),
+      }));
+      return exec.executionArn;
+    } catch (err) {
+      console.error(`Starting the journey for ${leadId} failed (attempt ${attempt})`, err);
+      if (attempt < 3) await new Promise((r) => setTimeout(r, 300 * 2 ** attempt));
+    }
+  }
+  return undefined;
 }
 
 /* ——— Milestones ——— */
@@ -175,6 +200,20 @@ export async function advance(taskToken: string): Promise<void> {
   } catch (err) {
     const name = (err as Error).name;
     if (!['TaskDoesNotExist', 'TaskTimedOut', 'InvalidToken'].includes(name)) throw err;
+  }
+}
+
+/** Fail the current step so the state machine's retry (and, after that, its error alert) takes over. */
+export async function failTask(taskToken: string, err: unknown): Promise<void> {
+  try {
+    await sfn.send(new SendTaskFailureCommand({
+      taskToken,
+      error: 'PhaseFailed',
+      cause: (err instanceof Error ? err.message : String(err)).slice(0, 1000),
+    }));
+  } catch (e) {
+    const name = (e as Error).name;
+    if (!['TaskDoesNotExist', 'TaskTimedOut', 'InvalidToken'].includes(name)) throw e;
   }
 }
 

@@ -14,6 +14,11 @@ export function formatWorkshopTime(iso: string, timeZone: string) {
   };
 }
 
+/** Calendar date (YYYY-MM-DD) in the given time zone. */
+export function localDate(d: Date, timeZone: string): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
+}
+
 /** Hour of day (0–23) in the given time zone. */
 function localHour(d: Date, timeZone: string): number {
   const h = new Intl.DateTimeFormat('en-US', { timeZone, hour: 'numeric', hourCycle: 'h23' }).format(d);

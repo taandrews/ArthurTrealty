@@ -39,3 +39,18 @@ export async function notifyStaff(lead: Lead, headline: string, details: string[
     console.error('Staff notification failed', err);
   }
 }
+
+/** Alert managers about something that has no client record (e.g. an ad-platform lead that couldn't be saved). */
+export async function notifyManagers(headline: string, details: string[] = []): Promise<void> {
+  const cfg = getConfig();
+  try {
+    // No "coordinator" attribute, so only the unfiltered (manager) subscriptions receive it.
+    await sns.send(new PublishCommand({
+      TopicArn: env.staffAlertsTopicArn,
+      Subject: `[${cfg.brandName}] ${headline}`.slice(0, 100),
+      Message: [headline, '', ...details].join('\n'),
+    }));
+  } catch (err) {
+    console.error('Staff notification failed', err);
+  }
+}

@@ -13,6 +13,7 @@ import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import * as sns from 'aws-cdk-lib/aws-sns';
 import * as subs from 'aws-cdk-lib/aws-sns-subscriptions';
 import * as sfn from 'aws-cdk-lib/aws-stepfunctions';
+import * as wafv2 from 'aws-cdk-lib/aws-wafv2';
 import type { Construct } from 'constructs';
 import * as path from 'node:path';
 import type { AppConfig } from '../src/config';
@@ -69,6 +70,8 @@ export class ArthurTRealtyStack extends Stack {
       partitionKey: { name: 'leadId', type: dynamodb.AttributeType.STRING },
       pointInTimeRecoverySpecification: { pointInTimeRecoveryEnabled: true },
       removalPolicy: RemovalPolicy.RETAIN,
+      // Only send-once markers and daily counters set this; lead records never expire.
+      timeToLiveAttribute: 'expiresAt',
       globalSecondaryIndexes: [
         { indexName: 'byPhone', partitionKey: { name: 'phone', type: dynamodb.AttributeType.STRING } },
         { indexName: 'byEmail', partitionKey: { name: 'email', type: dynamodb.AttributeType.STRING } },
@@ -173,7 +176,7 @@ export class ArthurTRealtyStack extends Stack {
       }));
       f.addToRolePolicy(new iam.PolicyStatement({ actions: ['iam:PassRole'], resources: [schedulerRole.roleArn] }));
       f.addToRolePolicy(new iam.PolicyStatement({
-        actions: ['states:StartExecution', 'states:SendTaskSuccess', 'states:StopExecution'],
+        actions: ['states:StartExecution', 'states:SendTaskSuccess', 'states:SendTaskFailure', 'states:StopExecution'],
         resources: [stateMachineArn, executionsArn],
       }));
       // AI calls go through Amazon Connect in the voice region; its IDs are read from an SSM parameter there.
@@ -278,7 +281,12 @@ export class ArthurTRealtyStack extends Stack {
 
     const api = new apigw.RestApi(this, 'Api', {
       restApiName: `${PREFIX}-api`,
-      deployOptions: { throttlingRateLimit: 20, throttlingBurstLimit: 40 },
+      deployOptions: {
+        throttlingRateLimit: 20,
+        throttlingBurstLimit: 40,
+        // The public lead form starts calls and texts, so it gets a much tighter limit than the rest of the API.
+        methodOptions: { '/public/leads/POST': { throttlingRateLimit: 2, throttlingBurstLimit: 5 } },
+      },
       defaultCorsPreflightOptions: {
         allowOrigins: [siteUrl, 'http://localhost:3100'],
         allowHeaders: ['Content-Type', 'Authorization', 'X-Api-Key'],
@@ -294,7 +302,10 @@ export class ArthurTRealtyStack extends Stack {
     const integration = new apigw.LambdaIntegration(apiFn);
     const authorizer = new apigw.CognitoUserPoolsAuthorizer(this, 'StaffAuthorizer', { cognitoUserPools: [users] });
 
-    api.root.addResource('public').addProxy({ defaultIntegration: integration, anyMethod: true });
+    const publicApi = api.root.addResource('public');
+    publicApi.addProxy({ defaultIntegration: integration, anyMethod: true });
+    // Its own method (same Lambda) so the stage can throttle it separately.
+    publicApi.addResource('leads').addMethod('POST', integration);
     api.root.addResource('webhooks').addProxy({ defaultIntegration: integration, anyMethod: true });
     api.root.addResource('integrations').addProxy({ anyMethod: false }).addMethod('ANY', integration, { apiKeyRequired: true });
     api.root.addResource('staff').addProxy({ anyMethod: false }).addMethod('ANY', integration, {
@@ -307,6 +318,39 @@ export class ArthurTRealtyStack extends Stack {
       throttle: { rateLimit: 10, burstLimit: 20 },
       apiStages: [{ api, stage: api.deploymentStage }],
     }).addApiKey(apiKey);
+
+    // Per-visitor limit on the public routes: an IP sending more than 20 requests in 5 minutes is blocked for a while.
+    const firewall = new wafv2.CfnWebACL(this, 'ApiFirewall', {
+      scope: 'REGIONAL',
+      defaultAction: { allow: {} },
+      visibilityConfig: { cloudWatchMetricsEnabled: true, metricName: `${PREFIX}-api`, sampledRequestsEnabled: true },
+      rules: [{
+        name: 'PublicRateLimit',
+        priority: 0,
+        action: { block: {} },
+        statement: {
+          rateBasedStatement: {
+            limit: 20,
+            evaluationWindowSec: 300,
+            aggregateKeyType: 'IP',
+            // The path WAF sees includes the stage name (/prod/public/...), so match anywhere in it.
+            scopeDownStatement: {
+              byteMatchStatement: {
+                fieldToMatch: { uriPath: {} },
+                positionalConstraint: 'CONTAINS',
+                searchString: '/public/',
+                textTransformations: [{ priority: 0, type: 'LOWERCASE' }],
+              },
+            },
+          },
+        },
+        visibilityConfig: { cloudWatchMetricsEnabled: true, metricName: `${PREFIX}-public-rate-limit`, sampledRequestsEnabled: true },
+      }],
+    });
+    new wafv2.CfnWebACLAssociation(this, 'ApiFirewallAssociation', {
+      resourceArn: api.deploymentStage.stageArn,
+      webAclArn: firewall.attrArn,
+    });
 
     /* ——— Outputs ——— */
 

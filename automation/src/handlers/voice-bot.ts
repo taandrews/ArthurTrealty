@@ -1,5 +1,6 @@
 import type { LexV2Event, LexV2Result } from 'aws-lambda';
 import { getConfig } from '../config';
+import { detectOptOut } from '../lib/opt-out';
 import { nowIso } from '../lib/time';
 import { extractAnswer, respond, stepInfo, type Turn } from '../services/assistant';
 import { sendSms } from '../services/channels';
@@ -41,6 +42,19 @@ export async function handler(event: LexV2Event): Promise<LexV2Result> {
     return close(event, session, `Thank you for calling ${getConfig().brandName}. A member of our team will follow up with you. Goodbye.`);
   }
   await noteCallerSpoke(lead, utterance);
+
+  // A clear "stop calling me" is honored right away, without the AI. "Don't text me" or "remove me" also stops texts.
+  const optOut = detectOptOut(utterance);
+  if (optOut) {
+    await updateLead(lead.leadId, {
+      callOptOut: true,
+      ...(optOut !== 'calls' ? { smsOptOut: true } : {}),
+      ...(optOut === 'all' ? { emailOptOut: true } : {}),
+    }, { remove: ['conversation'] });
+    await logActivity({ leadId: lead.leadId, kind: 'note', channel: 'call', summary: `Asked to stop ${{ calls: 'calls', texts: 'calls and texts', all: 'all contact' }[optOut]} on a call` });
+    delete session.fundsStep;
+    return close(event, session, `Understood, ${lead.firstName}. We won't ${optOut === 'calls' ? 'call you again' : 'call or text you again'}. Thank you, and goodbye.`, lead);
+  }
 
   // Lex's TalkToPerson intent is only a hint: "text me the link" can match it, so Claude makes the call.
   if (session.fundsStep !== undefined) return answerFundsQuestion(event, session, lead, utterance);

@@ -3,7 +3,7 @@ import { workshopReminder } from '../content/messages';
 import { nurtureEmail } from '../content/nurture';
 import { daysBetween, nowIso } from '../lib/time';
 import { placeCall, sendEmail, sendOutreach, sendSms } from '../services/channels';
-import { getLead, scanLeads, updateLead } from '../services/db';
+import { claimOnce, getLead, scanLeads, updateLead } from '../services/db';
 import { notifyStaff } from '../services/notify';
 import type { JobPayload } from '../services/scheduler';
 import type { Lead } from '../types';
@@ -16,6 +16,8 @@ export async function handler(event: JobPayload): Promise<void> {
     case 'deferredSend': {
       const lead = await getLead(event.leadId);
       if (!lead || !inProgram(lead)) return;
+      // The scheduler and Lambda both retry on errors; never send the same deferred call or text twice.
+      if (event.jobId && !(await claimOnce(`job#${event.jobId}`))) return;
       if (event.channel === 'sms') await sendSms(lead, event.message, 'Deferred text');
       else await placeCall(lead, event.message, 'Deferred call');
       return;
@@ -26,6 +28,7 @@ export async function handler(event: JobPayload): Promise<void> {
       // A newer registration supersedes reminders for the old date.
       if (!lead || lead.status !== 'active' || lead.milestones.workshop_attended) return;
       if (lead.workshop?.version !== event.version) return;
+      if (event.jobId && !(await claimOnce(`job#${event.jobId}`))) return;
       await sendOutreach(lead, workshopReminder({ cfg: getConfig(), lead }, event.label), `Workshop reminder (${event.label})`);
       return;
     }

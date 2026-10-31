@@ -5,8 +5,9 @@ import { env } from '../config';
 const client = new SchedulerClient({ region: env.dataRegion });
 
 export type JobPayload =
-  | { action: 'deferredSend'; leadId: string; channel: 'call' | 'sms'; message: string }
-  | { action: 'workshopReminder'; leadId: string; label: string; version: number }
+  /** `jobId` (set by scheduleJob) lets a retried invocation recognize it already ran. */
+  | { action: 'deferredSend'; leadId: string; channel: 'call' | 'sms'; message: string; jobId?: string }
+  | { action: 'workshopReminder'; leadId: string; label: string; version: number; jobId?: string }
   | { action: 'nurture' }
   | { action: 'inactivity' };
 
@@ -14,8 +15,9 @@ export type JobPayload =
 export async function scheduleJob(at: Date, payload: JobPayload, namePrefix: string): Promise<void> {
   // "at()" expressions take UTC time without a zone suffix.
   const when = at.toISOString().slice(0, 19);
+  const jobId = randomUUID();
   await client.send(new CreateScheduleCommand({
-    Name: `${namePrefix}-${randomUUID()}`.slice(0, 64),
+    Name: `${namePrefix}-${jobId}`.slice(0, 64),
     GroupName: env.schedulerGroup,
     ScheduleExpression: `at(${when})`,
     ScheduleExpressionTimezone: 'UTC',
@@ -24,7 +26,7 @@ export async function scheduleJob(at: Date, payload: JobPayload, namePrefix: str
     Target: {
       Arn: env.jobsFunctionArn,
       RoleArn: env.schedulerRoleArn,
-      Input: JSON.stringify(payload),
+      Input: JSON.stringify({ ...payload, jobId }),
     },
   }));
 }

@@ -1,15 +1,26 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, type KeyboardEvent, type FormEvent } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import {
   ArrowRight, ArrowLeft, CheckCircle2, ChevronDown, Home,
 } from 'lucide-react';
-import { quizQuestions, getTierFromCredit, type ResultTier } from '@/data/quiz-questions';
+import {
+  quizIntro, getVisibleQuestions, getResultTier, type ResultTier,
+} from '@/data/quiz-questions';
 import { marylandCounties } from '@/data/counties';
 import { getRuntimeConfig } from '@/lib/runtime-config';
 import { CONSENT_TEXT } from '@/lib/consent';
+
+/* ——— Brand palette ——— */
+const NAVY = '#0A1F44';
+const GOLD = '#D4A017';
+const GRAY_TEXT = '#5A6376';
+const BORDER = '#E2E4EA';
+/* Input outlines need 3:1 against white */
+const FIELD_BORDER = '#8A93A6';
+const ERROR = '#B91C1C';
 
 /* ——— Slide animation variants ——— */
 const slideVariants = {
@@ -29,71 +40,129 @@ const slideVariants = {
   }),
 };
 
-/* ——— Color map for tier results ——— */
-const tierStyles: Record<string, {
-  gradient: string; badgeBg: string; badgeText: string;
-  dotColor: string; checkColor: string; cardBg: string;
-  cardText: string; featureText: string; descText: string;
-  ctaBg: string; ctaHoverBg: string; ctaText: string;
+/* ——— Color map for result cards ——— */
+const tierStyles: Record<ResultTier['color'], {
+  checkColor: string; cardBg: string; cardText: string;
+  featureText: string; descText: string; eyebrowText: string;
+  badgeBg: string; badgeText: string; dotColor: string;
+  stepBg: string;
+  ctaBg: string; ctaText: string;
   timelineText: string; bandGradient: string;
 }> = {
-  emerald: {
-    gradient: 'linear-gradient(135deg, #059669, #10b981)',
-    badgeBg: '#ecfdf5', badgeText: '#047857',
-    dotColor: '#10b981', checkColor: '#10b981',
-    cardBg: '#ffffff', cardText: '#0A1F44',
-    featureText: 'rgba(10,31,68,0.7)', descText: '#6b7280',
-    ctaBg: '#059669', ctaHoverBg: '#047857', ctaText: '#ffffff',
-    timelineText: '#6b7280',
-    bandGradient: 'linear-gradient(to right, #34d399, #059669)',
+  light: {
+    checkColor: NAVY, cardBg: '#ffffff', cardText: NAVY,
+    featureText: GRAY_TEXT, descText: GRAY_TEXT, eyebrowText: GRAY_TEXT,
+    badgeBg: '#F5F6FA', badgeText: NAVY, dotColor: GOLD,
+    stepBg: '#F5F6FA',
+    ctaBg: NAVY, ctaText: '#ffffff',
+    timelineText: NAVY,
+    bandGradient: `linear-gradient(to right, ${NAVY}, ${GOLD})`,
   },
-  gold: {
-    gradient: 'linear-gradient(135deg, #D4A017, #e6b422)',
-    badgeBg: 'rgba(212,160,23,0.1)', badgeText: '#D4A017',
-    dotColor: '#D4A017', checkColor: '#D4A017',
-    cardBg: '#0A1F44', cardText: '#ffffff',
-    featureText: 'rgba(255,255,255,0.7)', descText: 'rgba(255,255,255,0.5)',
-    ctaBg: '#D4A017', ctaHoverBg: '#e6b422', ctaText: '#0A1F44',
-    timelineText: 'rgba(255,255,255,0.4)',
-    bandGradient: 'linear-gradient(to right, #D4A017, #e6b422)',
-  },
-  navy: {
-    gradient: 'linear-gradient(135deg, #64748b, #0A1F44)',
-    badgeBg: '#f1f5f9', badgeText: '#475569',
-    dotColor: '#0A1F44', checkColor: '#0A1F44',
-    cardBg: '#ffffff', cardText: '#0A1F44',
-    featureText: 'rgba(10,31,68,0.7)', descText: '#6b7280',
-    ctaBg: '#0A1F44', ctaHoverBg: '#132d56', ctaText: '#ffffff',
-    timelineText: '#6b7280',
-    bandGradient: 'linear-gradient(to right, #94a3b8, #0A1F44)',
+  dark: {
+    checkColor: GOLD, cardBg: NAVY, cardText: '#ffffff',
+    featureText: 'rgba(255,255,255,0.85)', descText: 'rgba(255,255,255,0.85)', eyebrowText: 'rgba(255,255,255,0.8)',
+    badgeBg: 'rgba(212,160,23,0.15)', badgeText: GOLD, dotColor: GOLD,
+    stepBg: 'rgba(255,255,255,0.06)',
+    ctaBg: GOLD, ctaText: NAVY,
+    timelineText: '#ffffff',
+    bandGradient: `linear-gradient(to right, ${GOLD}, #e6b422)`,
   },
 };
+
+/* ——— Contact validation ——— */
+function phoneDigits(raw: string): string {
+  const d = raw.replace(/\D/g, '');
+  return d.length === 11 && d.startsWith('1') ? d.slice(1) : d;
+}
+const isValidPhone = (raw: string) => /^[2-9]\d{2}[2-9]\d{6}$/.test(phoneDigits(raw));
+const isValidEmail = (raw: string) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(raw.trim());
+
+/* Shared styles */
+const labelStyle = {
+  display: 'block', fontFamily: 'var(--font-heading)', fontWeight: 600,
+  fontSize: '14px', color: NAVY, marginBottom: '6px',
+} as const;
+const errorStyle = {
+  fontFamily: 'var(--font-body)', fontSize: '14px', color: ERROR, margin: '6px 0 0 0',
+} as const;
+const fieldStyle = (invalid: boolean) => ({
+  width: '100%', padding: '14px 18px', minHeight: '52px', borderRadius: '12px',
+  border: `2px solid ${invalid ? ERROR : FIELD_BORDER}`, background: '#ffffff',
+  fontFamily: 'var(--font-body)', fontSize: '16px', color: NAVY,
+  boxSizing: 'border-box' as const,
+});
+const backButtonStyle = {
+  display: 'flex', alignItems: 'center', gap: '8px',
+  minHeight: '44px', padding: '12px 20px', borderRadius: '10px',
+  border: `1px solid ${FIELD_BORDER}`, background: '#ffffff',
+  fontFamily: 'var(--font-heading)', fontWeight: 600, fontSize: '14px',
+  color: GRAY_TEXT, cursor: 'pointer', transition: 'all 0.2s ease',
+} as const;
+const primaryButtonStyle = (enabled: boolean) => ({
+  display: 'flex', alignItems: 'center', gap: '8px',
+  minHeight: '48px', padding: '14px 28px', borderRadius: '10px',
+  border: 'none',
+  background: enabled ? GOLD : BORDER,
+  fontFamily: 'var(--font-heading)', fontWeight: 700, fontSize: '15px',
+  color: enabled ? NAVY : GRAY_TEXT,
+  cursor: enabled ? 'pointer' : 'default',
+  transition: 'all 0.2s ease',
+  boxShadow: enabled ? '0 8px 30px -6px rgba(212,160,23,0.35)' : 'none',
+});
+/* Visible navy focus ring (inline styles can't express :focus, and the
+   unlayered global gold ring would beat Tailwind utilities) */
+const FOCUS_RING = 'quiz-focus';
+const FIELD_FOCUS = 'quiz-field';
+const QUIZ_CSS = `
+.quiz-root .quiz-focus:focus-visible { outline: 3px solid ${NAVY}; outline-offset: 3px; }
+.quiz-root .quiz-field:focus { outline: 3px solid ${NAVY}; outline-offset: 1px; }
+.quiz-root .quiz-heading:focus, .quiz-root .quiz-heading:focus-visible { outline: none; }
+`;
+
+const EMPTY_LEAD = { name: '', email: '', phone: '', company: '' };
+
+type Field = 'name' | 'email' | 'phone' | 'consent';
 
 export default function QuizPage() {
   const [step, setStep] = useState(0);
   const [direction, setDirection] = useState(1);
   const [answers, setAnswers] = useState<Record<string, string>>({});
-  const [leadForm, setLeadForm] = useState({ name: '', email: '', phone: '', company: '' });
+  const [leadForm, setLeadForm] = useState(EMPTY_LEAD);
+  const [touched, setTouched] = useState<Partial<Record<Field, boolean>>>({});
+  const [submitAttempted, setSubmitAttempted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [tcpaChecked, setTcpaChecked] = useState(false);
   const [result, setResult] = useState<ResultTier | null>(null);
   const [phase, setPhase] = useState<'quiz' | 'lead' | 'result'>('quiz');
 
-  const totalSteps = quizQuestions.length;
+  const focusPending = useRef(false);
+  const optionRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const fieldRefs = useRef<Partial<Record<Field, HTMLInputElement | null>>>({});
 
-  /* Build county options for the dropdown question */
-  const questions = quizQuestions.map((q) =>
+  /* Questions that apply to this person (sellers and investors skip the money questions) */
+  const questions = getVisibleQuestions(answers).map((q) =>
     q.id === 'county'
       ? { ...q, options: marylandCounties.map((c) => ({ label: c, value: c })) }
       : q,
   );
+  const totalSteps = questions.length;
 
   const currentQuestion = questions[step];
   const isAnswered = !!answers[currentQuestion?.id];
+  const headingId = `quiz-heading-${phase}-${step}`;
+
+  /* Move focus to each new heading after the slide animation mounts it */
+  const headingRef = useCallback((el: HTMLHeadingElement | null) => {
+    if (el && focusPending.current) {
+      focusPending.current = false;
+      el.focus();
+    }
+  }, []);
 
   const goNext = useCallback(() => {
     setDirection(1);
+    focusPending.current = true;
     if (step < totalSteps - 1) {
       setStep((s) => s + 1);
     } else {
@@ -103,6 +172,7 @@ export default function QuizPage() {
 
   const goBack = useCallback(() => {
     setDirection(-1);
+    focusPending.current = true;
     if (phase === 'lead') {
       setPhase('quiz');
     } else if (step > 0) {
@@ -114,20 +184,81 @@ export default function QuizPage() {
     setAnswers((prev) => ({ ...prev, [questionId]: value }));
   }, []);
 
-  const submitLead = useCallback(async () => {
+  /* Radio group keyboard support: arrows move and select, Home/End jump */
+  const onOptionKeyDown = useCallback((e: KeyboardEvent<HTMLButtonElement>, index: number) => {
+    if (!currentQuestion) return;
+    const count = currentQuestion.options.length;
+    let next = -1;
+    if (e.key === 'ArrowDown' || e.key === 'ArrowRight') next = (index + 1) % count;
+    else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') next = (index - 1 + count) % count;
+    else if (e.key === 'Home') next = 0;
+    else if (e.key === 'End') next = count - 1;
+    else if (e.key === ' ' || e.key === 'Enter') {
+      e.preventDefault();
+      selectAnswer(currentQuestion.id, currentQuestion.options[index].value);
+      return;
+    }
+    if (next < 0) return;
+    e.preventDefault();
+    selectAnswer(currentQuestion.id, currentQuestion.options[next].value);
+    optionRefs.current[next]?.focus();
+  }, [currentQuestion, selectAnswer]);
+
+  /* ——— Contact step validation ——— */
+  const phoneOk = isValidPhone(leadForm.phone);
+  const emailOk = !leadForm.email.trim() || isValidEmail(leadForm.email);
+  const fieldErrors: Record<Field, string> = {
+    name: leadForm.name.trim() ? '' : 'Please add your name.',
+    phone: !leadForm.phone.trim()
+      ? 'Please add your mobile number.'
+      : phoneOk ? '' : 'Please enter a 10-digit US mobile number.',
+    email: emailOk ? '' : 'Please check your email address, or leave it blank.',
+    consent: tcpaChecked ? '' : 'Please check the box so your assistant can call you.',
+  };
+  const showError = (f: Field) => (touched[f] || submitAttempted) && !!fieldErrors[f];
+  const isLeadValid = !fieldErrors.name && !fieldErrors.phone && !fieldErrors.email && !fieldErrors.consent;
+
+  /* Short line under the button saying what's still needed,
+     e.g. "Add your mobile number and check the consent box." */
+  const joinAnd = (items: string[]) =>
+    items.length > 1 ? `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}` : items[0];
+  const toAdd: string[] = [];
+  const toCheck: string[] = [];
+  if (fieldErrors.name) toAdd.push('your name');
+  if (fieldErrors.phone) (leadForm.phone.trim() ? toCheck : toAdd).push('your mobile number');
+  if (fieldErrors.email) toCheck.push('your email');
+  if (fieldErrors.consent) toCheck.push('the consent box');
+  const missingParts = [
+    toAdd.length ? `add ${joinAnd(toAdd)}` : '',
+    toCheck.length ? `check ${joinAnd(toCheck)}` : '',
+  ].filter(Boolean).join(', and ');
+  const missingText = missingParts ? `${missingParts.charAt(0).toUpperCase()}${missingParts.slice(1)}.` : '';
+
+  const submitLead = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (submitting) return;
+    setSubmitAttempted(true);
+    if (!isLeadValid) {
+      const firstInvalid = (['name', 'phone', 'email', 'consent'] as Field[]).find((f) => fieldErrors[f]);
+      if (firstInvalid) fieldRefs.current[firstInvalid]?.focus();
+      return;
+    }
     setSubmitting(true);
     setSubmitError('');
+    /* Only send answers to questions this person actually saw */
+    const visibleIds = new Set(getVisibleQuestions(answers).map((q) => q.id));
+    const sentAnswers = Object.fromEntries(Object.entries(answers).filter(([k]) => visibleIds.has(k)));
     try {
       const { apiUrl } = await getRuntimeConfig();
       const res = await fetch(`${apiUrl}/public/leads`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: leadForm.name,
-          email: leadForm.email,
-          phone: leadForm.phone,
+          name: leadForm.name.trim(),
+          email: leadForm.email.trim(),
+          phone: `+1${phoneDigits(leadForm.phone)}`,
           company: leadForm.company,
-          answers,
+          answers: sentAnswers,
           consent: tcpaChecked,
           consentText: CONSENT_TEXT,
         }),
@@ -144,38 +275,69 @@ export default function QuizPage() {
       return;
     }
     setSubmitting(false);
-    const tier = getTierFromCredit(answers.credit || '');
-    setResult(tier);
+    setResult(getResultTier(sentAnswers));
     setDirection(1);
+    focusPending.current = true;
     setPhase('result');
-  }, [answers, leadForm, tcpaChecked]);
+  };
 
-  const isLeadValid = leadForm.name.trim() && leadForm.email.trim() && tcpaChecked && !submitting;
+  /* Retake resets local state only; nothing is sent */
+  const retake = useCallback(() => {
+    setStep(0);
+    setAnswers({});
+    setLeadForm(EMPTY_LEAD);
+    setTouched({});
+    setSubmitAttempted(false);
+    setSubmitError('');
+    setTcpaChecked(false);
+    setResult(null);
+    setDirection(-1);
+    focusPending.current = true;
+    setPhase('quiz');
+  }, []);
 
-  /* ——— Progress bar width ——— */
+  /* ——— Progress (Q1 starts above 0%; the contact step comes before 100%) ——— */
   const progressPct =
     phase === 'result' ? 100
-      : phase === 'lead' ? ((totalSteps) / (totalSteps + 1)) * 100
-        : ((step) / (totalSteps + 1)) * 100;
+      : phase === 'lead' ? ((totalSteps + 1) / (totalSteps + 2)) * 100
+        : ((step + 1) / (totalSteps + 2)) * 100;
+  const progressLabel = phase === 'lead' ? 'Almost done' : `Question ${step + 1} of ${totalSteps}`;
+  const liveMessage = phase === 'result'
+    ? 'Your results'
+    : phase === 'lead' ? 'Almost done: contact details' : progressLabel;
+
+  const firstName = leadForm.name.trim().split(/\s+/)[0] || '';
 
   return (
-    <section style={{ minHeight: '100svh', background: '#F5F6FA', paddingTop: '120px', paddingBottom: '80px' }}>
+    <section className="quiz-root" style={{ minHeight: '100svh', background: '#F5F6FA', overflowX: 'clip', paddingTop: '120px', paddingBottom: '80px' }}>
+      <style>{QUIZ_CSS}</style>
       <div style={{ maxWidth: '640px', margin: '0 auto', paddingLeft: '24px', paddingRight: '24px' }}>
+
+        {/* Announces each step change to screen readers */}
+        <div aria-live="polite" className="sr-only">{liveMessage}</div>
 
         {/* ── Progress Bar ── */}
         {phase !== 'result' && (
           <div style={{ marginBottom: '48px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-              <span style={{ fontSize: '13px', fontFamily: 'var(--font-heading)', fontWeight: 700, color: '#0A1F44', letterSpacing: '0.05em', textTransform: 'uppercase' as const }}>
-                {phase === 'lead' ? 'Almost done' : `Question ${step + 1} of ${totalSteps}`}
+              <span style={{ fontSize: '13px', fontFamily: 'var(--font-heading)', fontWeight: 700, color: NAVY, letterSpacing: '0.05em', textTransform: 'uppercase' as const }}>
+                {progressLabel}
               </span>
-              <span style={{ fontSize: '13px', fontFamily: 'var(--font-body)', color: '#9ca3af' }}>
+              <span aria-hidden="true" style={{ fontSize: '13px', fontFamily: 'var(--font-body)', color: GRAY_TEXT }}>
                 {Math.round(progressPct)}%
               </span>
             </div>
-            <div style={{ height: '4px', borderRadius: '999px', background: '#e5e7eb', overflow: 'hidden' }}>
+            <div
+              role="progressbar"
+              aria-label="Quiz progress"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={Math.round(progressPct)}
+              aria-valuetext={`${progressLabel}, ${Math.round(progressPct)}%`}
+              style={{ height: '6px', borderRadius: '999px', background: BORDER, overflow: 'hidden' }}
+            >
               <motion.div
-                style={{ height: '100%', borderRadius: '999px', background: 'linear-gradient(to right, #D4A017, #e6b422)' }}
+                style={{ height: '100%', borderRadius: '999px', background: `linear-gradient(to right, ${GOLD}, #e6b422)` }}
                 initial={false}
                 animate={{ width: `${progressPct}%` }}
                 transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
@@ -186,116 +348,140 @@ export default function QuizPage() {
 
         {/* ── Quiz Questions ── */}
         <AnimatePresence mode="wait" custom={direction}>
-          {phase === 'quiz' && (
+          {phase === 'quiz' && currentQuestion && (
             <motion.div
-              key={`question-${step}`}
+              key={`question-${currentQuestion.id}`}
               custom={direction}
               variants={slideVariants}
               initial="enter"
               animate="center"
               exit="exit"
             >
-              <h1 style={{
-                fontFamily: 'var(--font-heading)', fontWeight: 800, fontSize: 'clamp(1.5rem, 4vw, 1.85rem)',
-                color: '#0A1F44', marginBottom: '32px', lineHeight: 1.2,
-              }}>
+              {step === 0 && (
+                <p style={{
+                  fontFamily: 'var(--font-body)', fontSize: '15px', color: GRAY_TEXT,
+                  margin: '0 0 10px 0',
+                }}>
+                  {quizIntro}
+                </p>
+              )}
+              <h1
+                id={headingId}
+                ref={headingRef}
+                tabIndex={-1}
+                className="quiz-heading"
+                style={{
+                  fontFamily: 'var(--font-heading)', fontWeight: 800, fontSize: 'clamp(1.5rem, 4vw, 1.85rem)',
+                  color: NAVY, marginBottom: currentQuestion.helper ? '10px' : '32px', lineHeight: 1.2,
+                }}
+              >
                 {currentQuestion.question}
               </h1>
+              {currentQuestion.helper && (
+                <p style={{
+                  fontFamily: 'var(--font-body)', fontSize: '15px', color: GRAY_TEXT,
+                  lineHeight: 1.6, margin: '0 0 28px 0',
+                }}>
+                  {currentQuestion.helper}
+                </p>
+              )}
 
               {/* Radio options */}
-              {currentQuestion.type === 'radio' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  {currentQuestion.options.map((opt) => {
-                    const selected = answers[currentQuestion.id] === opt.value;
-                    return (
-                      <button
-                        key={opt.value}
-                        onClick={() => selectAnswer(currentQuestion.id, opt.value)}
-                        style={{
-                          width: '100%', textAlign: 'left', cursor: 'pointer',
-                          padding: '18px 24px', borderRadius: '14px',
-                          border: selected ? '2px solid #D4A017' : '2px solid #e5e7eb',
-                          background: selected ? 'rgba(212,160,23,0.06)' : '#ffffff',
-                          fontFamily: 'var(--font-body)', fontSize: '15px', color: '#0A1F44',
-                          fontWeight: selected ? 600 : 400,
-                          transition: 'all 0.2s ease',
-                          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                          boxShadow: selected ? '0 4px 20px -4px rgba(212,160,23,0.15)' : '0 1px 3px rgba(0,0,0,0.04)',
-                        }}
-                      >
-                        <span>{opt.label}</span>
-                        {selected && (
-                          <CheckCircle2 style={{ width: '20px', height: '20px', color: '#D4A017', flexShrink: 0 }} />
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
+              {currentQuestion.type === 'radio' && (() => {
+                const selectedIndex = currentQuestion.options.findIndex((o) => o.value === answers[currentQuestion.id]);
+                return (
+                  <div role="radiogroup" aria-labelledby={headingId} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {currentQuestion.options.map((opt, i) => {
+                      const selected = i === selectedIndex;
+                      const tabbable = selectedIndex < 0 ? i === 0 : selected;
+                      return (
+                        <button
+                          key={opt.value}
+                          ref={(el) => { optionRefs.current[i] = el; }}
+                          type="button"
+                          role="radio"
+                          aria-checked={selected}
+                          tabIndex={tabbable ? 0 : -1}
+                          onClick={() => selectAnswer(currentQuestion.id, opt.value)}
+                          onKeyDown={(e) => onOptionKeyDown(e, i)}
+                          className={FOCUS_RING}
+                          style={{
+                            width: '100%', textAlign: 'left', cursor: 'pointer',
+                            minHeight: '56px', padding: '16px 24px', borderRadius: '14px',
+                            border: selected ? `2px solid ${GOLD}` : `2px solid ${BORDER}`,
+                            background: selected ? 'rgba(212,160,23,0.06)' : '#ffffff',
+                            fontFamily: 'var(--font-body)', fontSize: '15px', color: NAVY,
+                            fontWeight: selected ? 600 : 400,
+                            transition: 'all 0.2s ease',
+                            display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px',
+                            boxShadow: selected ? '0 4px 20px -4px rgba(212,160,23,0.15)' : '0 1px 3px rgba(0,0,0,0.04)',
+                          }}
+                        >
+                          <span>{opt.label}</span>
+                          {selected && (
+                            <CheckCircle2 aria-hidden="true" style={{ width: '20px', height: '20px', color: NAVY, flexShrink: 0 }} />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
 
               {/* Dropdown */}
               {currentQuestion.type === 'dropdown' && (
-                <div style={{ position: 'relative' }}>
-                  <select
-                    value={answers[currentQuestion.id] || ''}
-                    onChange={(e) => selectAnswer(currentQuestion.id, e.target.value)}
-                    style={{
-                      width: '100%', padding: '18px 48px 18px 24px', borderRadius: '14px',
-                      border: answers[currentQuestion.id] ? '2px solid #D4A017' : '2px solid #e5e7eb',
-                      background: answers[currentQuestion.id] ? 'rgba(212,160,23,0.06)' : '#ffffff',
-                      fontFamily: 'var(--font-body)', fontSize: '15px', color: '#0A1F44',
-                      appearance: 'none', cursor: 'pointer',
-                      boxShadow: answers[currentQuestion.id] ? '0 4px 20px -4px rgba(212,160,23,0.15)' : '0 1px 3px rgba(0,0,0,0.04)',
-                    }}
-                  >
-                    <option value="">Select your county...</option>
-                    {currentQuestion.options.map((opt) => (
-                      <option key={opt.value} value={opt.value}>{opt.label}</option>
-                    ))}
-                  </select>
-                  <ChevronDown style={{
-                    position: 'absolute', right: '18px', top: '50%', transform: 'translateY(-50%)',
-                    width: '20px', height: '20px', color: '#9ca3af', pointerEvents: 'none',
-                  }} />
+                <div>
+                  <label htmlFor={`quiz-${currentQuestion.id}`} style={labelStyle}>
+                    County or Baltimore City
+                  </label>
+                  <div style={{ position: 'relative' }}>
+                    <select
+                      id={`quiz-${currentQuestion.id}`}
+                      name={currentQuestion.id}
+                      value={answers[currentQuestion.id] || ''}
+                      onChange={(e) => selectAnswer(currentQuestion.id, e.target.value)}
+                      className={FIELD_FOCUS}
+                      style={{
+                        width: '100%', minHeight: '56px', padding: '16px 48px 16px 24px', borderRadius: '14px',
+                        border: answers[currentQuestion.id] ? `2px solid ${GOLD}` : `2px solid ${FIELD_BORDER}`,
+                        background: answers[currentQuestion.id] ? 'rgba(212,160,23,0.06)' : '#ffffff',
+                        fontFamily: 'var(--font-body)', fontSize: '16px', color: NAVY,
+                        appearance: 'none', cursor: 'pointer',
+                        boxShadow: answers[currentQuestion.id] ? '0 4px 20px -4px rgba(212,160,23,0.15)' : '0 1px 3px rgba(0,0,0,0.04)',
+                      }}
+                    >
+                      <option value="">Select your county...</option>
+                      {currentQuestion.options.map((opt) => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      ))}
+                    </select>
+                    <ChevronDown aria-hidden="true" style={{
+                      position: 'absolute', right: '18px', top: '50%', transform: 'translateY(-50%)',
+                      width: '20px', height: '20px', color: GRAY_TEXT, pointerEvents: 'none',
+                    }} />
+                  </div>
                 </div>
               )}
 
               {/* Navigation Buttons */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '40px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginTop: '40px' }}>
                 {step > 0 ? (
-                  <button
-                    onClick={goBack}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: '8px',
-                      padding: '12px 20px', borderRadius: '10px',
-                      border: '1px solid #e5e7eb', background: '#ffffff',
-                      fontFamily: 'var(--font-heading)', fontWeight: 600, fontSize: '14px',
-                      color: '#6b7280', cursor: 'pointer', transition: 'all 0.2s ease',
-                    }}
-                  >
-                    <ArrowLeft style={{ width: '16px', height: '16px' }} />
+                  <button type="button" onClick={goBack} className={FOCUS_RING} style={backButtonStyle}>
+                    <ArrowLeft aria-hidden="true" style={{ width: '16px', height: '16px' }} />
                     Back
                   </button>
                 ) : (
                   <div />
                 )}
                 <button
+                  type="button"
                   onClick={goNext}
                   disabled={!isAnswered}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: '8px',
-                    padding: '14px 28px', borderRadius: '10px',
-                    border: 'none',
-                    background: isAnswered ? '#D4A017' : '#e5e7eb',
-                    fontFamily: 'var(--font-heading)', fontWeight: 700, fontSize: '15px',
-                    color: isAnswered ? '#0A1F44' : '#9ca3af',
-                    cursor: isAnswered ? 'pointer' : 'default',
-                    transition: 'all 0.2s ease',
-                    boxShadow: isAnswered ? '0 8px 30px -6px rgba(212,160,23,0.35)' : 'none',
-                  }}
+                  className={FOCUS_RING}
+                  style={primaryButtonStyle(isAnswered)}
                 >
                   {step === totalSteps - 1 ? 'Continue' : 'Next'}
-                  <ArrowRight style={{ width: '16px', height: '16px' }} />
+                  <ArrowRight aria-hidden="true" style={{ width: '16px', height: '16px' }} />
                 </button>
               </div>
             </motion.div>
@@ -311,159 +497,185 @@ export default function QuizPage() {
               animate="center"
               exit="exit"
             >
-              <h1 style={{
-                fontFamily: 'var(--font-heading)', fontWeight: 800, fontSize: 'clamp(1.5rem, 4vw, 1.85rem)',
-                color: '#0A1F44', marginBottom: '8px', lineHeight: 1.2,
-              }}>
-                Your results are ready!
+              <h1
+                id={headingId}
+                ref={headingRef}
+                tabIndex={-1}
+                className="quiz-heading"
+                style={{
+                  fontFamily: 'var(--font-heading)', fontWeight: 800, fontSize: 'clamp(1.5rem, 4vw, 1.85rem)',
+                  color: NAVY, marginBottom: '8px', lineHeight: 1.2,
+                }}
+              >
+                Where should your assistant call you?
               </h1>
               <p style={{
-                fontFamily: 'var(--font-body)', fontSize: '15px', color: '#6b7280',
-                lineHeight: 1.6, marginBottom: '32px',
+                fontFamily: 'var(--font-body)', fontSize: '15px', color: GRAY_TEXT,
+                lineHeight: 1.6, marginBottom: '8px',
               }}>
-                Enter your info below so we can send your personalized homeownership plan.
+                Your assistant will call you with your first step, between 9am and 8pm Eastern.
+              </p>
+              <p style={{ fontFamily: 'var(--font-body)', fontSize: '14px', color: GRAY_TEXT, marginBottom: '28px' }}>
+                <span aria-hidden="true" style={{ color: ERROR }}>*</span> Required
               </p>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <div>
-                  <label style={{
-                    display: 'block', fontFamily: 'var(--font-heading)', fontWeight: 600,
-                    fontSize: '13px', color: '#0A1F44', marginBottom: '6px', textTransform: 'uppercase' as const,
-                    letterSpacing: '0.04em',
-                  }}>
-                    Full Name
-                  </label>
+              <form onSubmit={submitLead} noValidate aria-labelledby={headingId}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                  <div>
+                    <label htmlFor="quiz-name" style={labelStyle}>
+                      Full name <span aria-hidden="true" style={{ color: ERROR }}>*</span>
+                    </label>
+                    <input
+                      ref={(el) => { fieldRefs.current.name = el; }}
+                      id="quiz-name"
+                      name="name"
+                      type="text"
+                      autoComplete="name"
+                      required
+                      aria-required="true"
+                      aria-invalid={showError('name')}
+                      aria-describedby={showError('name') ? 'quiz-name-error' : undefined}
+                      placeholder="Your full name"
+                      value={leadForm.name}
+                      onChange={(e) => setLeadForm((f) => ({ ...f, name: e.target.value }))}
+                      onBlur={() => setTouched((t) => ({ ...t, name: true }))}
+                      className={FIELD_FOCUS}
+                      style={fieldStyle(showError('name'))}
+                    />
+                    {showError('name') && <p id="quiz-name-error" style={errorStyle}>{fieldErrors.name}</p>}
+                  </div>
+
+                  <div>
+                    <label htmlFor="quiz-phone" style={labelStyle}>
+                      Mobile phone (your assistant will call here) <span aria-hidden="true" style={{ color: ERROR }}>*</span>
+                    </label>
+                    <input
+                      ref={(el) => { fieldRefs.current.phone = el; }}
+                      id="quiz-phone"
+                      name="phone"
+                      type="tel"
+                      inputMode="tel"
+                      autoComplete="tel"
+                      required
+                      aria-required="true"
+                      aria-invalid={showError('phone')}
+                      aria-describedby={showError('phone') ? 'quiz-phone-error' : undefined}
+                      placeholder="(410) 555-0123"
+                      value={leadForm.phone}
+                      onChange={(e) => setLeadForm((f) => ({ ...f, phone: e.target.value }))}
+                      onBlur={() => setTouched((t) => ({ ...t, phone: true }))}
+                      className={FIELD_FOCUS}
+                      style={fieldStyle(showError('phone'))}
+                    />
+                    {showError('phone') && <p id="quiz-phone-error" style={errorStyle}>{fieldErrors.phone}</p>}
+                  </div>
+
+                  <div>
+                    <label htmlFor="quiz-email" style={labelStyle}>
+                      Email <span style={{ fontWeight: 400, color: GRAY_TEXT }}>(optional)</span>
+                    </label>
+                    <input
+                      ref={(el) => { fieldRefs.current.email = el; }}
+                      id="quiz-email"
+                      name="email"
+                      type="email"
+                      inputMode="email"
+                      autoComplete="email"
+                      aria-invalid={showError('email')}
+                      aria-describedby={showError('email') ? 'quiz-email-error' : undefined}
+                      placeholder="you@email.com"
+                      value={leadForm.email}
+                      onChange={(e) => setLeadForm((f) => ({ ...f, email: e.target.value }))}
+                      onBlur={() => setTouched((t) => ({ ...t, email: true }))}
+                      className={FIELD_FOCUS}
+                      style={fieldStyle(showError('email'))}
+                    />
+                    {showError('email') && <p id="quiz-email-error" style={errorStyle}>{fieldErrors.email}</p>}
+                  </div>
+
+                  {/* TCPA Checkbox */}
+                  <div>
+                    <label htmlFor="quiz-consent" style={{
+                      display: 'flex', alignItems: 'flex-start', gap: '12px',
+                      marginTop: '4px', cursor: 'pointer',
+                    }}>
+                      <input
+                        ref={(el) => { fieldRefs.current.consent = el; }}
+                        id="quiz-consent"
+                        name="consent"
+                        type="checkbox"
+                        required
+                        aria-required="true"
+                        aria-invalid={showError('consent')}
+                        aria-describedby={showError('consent') ? 'quiz-consent-error' : undefined}
+                        checked={tcpaChecked}
+                        onChange={(e) => setTcpaChecked(e.target.checked)}
+                        onBlur={() => setTouched((t) => ({ ...t, consent: true }))}
+                        className={FIELD_FOCUS}
+                        style={{
+                          width: '22px', height: '22px', marginTop: '1px',
+                          accentColor: NAVY, flexShrink: 0, cursor: 'pointer',
+                        }}
+                      />
+                      <span style={{
+                        fontFamily: 'var(--font-body)', fontSize: '13.5px', color: GRAY_TEXT,
+                        lineHeight: 1.55,
+                      }}>
+                        {CONSENT_TEXT} <span aria-hidden="true" style={{ color: ERROR }}>*</span>
+                      </span>
+                    </label>
+                    {showError('consent') && <p id="quiz-consent-error" style={errorStyle}>{fieldErrors.consent}</p>}
+                  </div>
+
+                  {/* Hidden from people; bots that fill it in are ignored */}
                   <input
                     type="text"
-                    placeholder="Your full name"
-                    value={leadForm.name}
-                    onChange={(e) => setLeadForm((f) => ({ ...f, name: e.target.value }))}
-                    style={{
-                      width: '100%', padding: '16px 20px', borderRadius: '12px',
-                      border: '2px solid #e5e7eb', background: '#ffffff',
-                      fontFamily: 'var(--font-body)', fontSize: '15px', color: '#0A1F44',
-                      outline: 'none', boxSizing: 'border-box',
-                    }}
+                    name="company"
+                    tabIndex={-1}
+                    autoComplete="off"
+                    aria-hidden="true"
+                    value={leadForm.company}
+                    onChange={(e) => setLeadForm((f) => ({ ...f, company: e.target.value }))}
+                    style={{ position: 'absolute', left: '-9999px', width: '1px', height: '1px', opacity: 0 }}
                   />
-                </div>
-                <div>
-                  <label style={{
-                    display: 'block', fontFamily: 'var(--font-heading)', fontWeight: 600,
-                    fontSize: '13px', color: '#0A1F44', marginBottom: '6px', textTransform: 'uppercase' as const,
-                    letterSpacing: '0.04em',
-                  }}>
-                    Email
-                  </label>
-                  <input
-                    type="email"
-                    placeholder="you@email.com"
-                    value={leadForm.email}
-                    onChange={(e) => setLeadForm((f) => ({ ...f, email: e.target.value }))}
-                    style={{
-                      width: '100%', padding: '16px 20px', borderRadius: '12px',
-                      border: '2px solid #e5e7eb', background: '#ffffff',
-                      fontFamily: 'var(--font-body)', fontSize: '15px', color: '#0A1F44',
-                      outline: 'none', boxSizing: 'border-box',
-                    }}
-                  />
-                </div>
-                <div>
-                  <label style={{
-                    display: 'block', fontFamily: 'var(--font-heading)', fontWeight: 600,
-                    fontSize: '13px', color: '#0A1F44', marginBottom: '6px', textTransform: 'uppercase' as const,
-                    letterSpacing: '0.04em',
-                  }}>
-                    Phone
-                  </label>
-                  <input
-                    type="tel"
-                    placeholder="(555) 123-4567"
-                    value={leadForm.phone}
-                    onChange={(e) => setLeadForm((f) => ({ ...f, phone: e.target.value }))}
-                    style={{
-                      width: '100%', padding: '16px 20px', borderRadius: '12px',
-                      border: '2px solid #e5e7eb', background: '#ffffff',
-                      fontFamily: 'var(--font-body)', fontSize: '15px', color: '#0A1F44',
-                      outline: 'none', boxSizing: 'border-box',
-                    }}
-                  />
+
+                  {submitError && (
+                    <p role="alert" style={{ fontFamily: 'var(--font-body)', fontSize: '14px', color: ERROR, margin: 0 }}>
+                      {submitError}
+                    </p>
+                  )}
                 </div>
 
-                {/* TCPA Checkbox */}
-                <label style={{
-                  display: 'flex', alignItems: 'flex-start', gap: '12px',
-                  marginTop: '8px', cursor: 'pointer',
-                }}>
-                  <input
-                    type="checkbox"
-                    checked={tcpaChecked}
-                    onChange={(e) => setTcpaChecked(e.target.checked)}
+                {/* Form Buttons */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginTop: '36px' }}>
+                  <button type="button" onClick={goBack} className={FOCUS_RING} style={backButtonStyle}>
+                    <ArrowLeft aria-hidden="true" style={{ width: '16px', height: '16px' }} />
+                    Back
+                  </button>
+                  <button
+                    type="submit"
+                    aria-disabled={!isLeadValid || submitting}
+                    aria-describedby={missingText ? 'quiz-missing' : undefined}
+                    className={FOCUS_RING}
+                    style={primaryButtonStyle(isLeadValid && !submitting)}
+                  >
+                    {submitting ? 'Sending…' : 'See My Results'}
+                    <ArrowRight aria-hidden="true" style={{ width: '16px', height: '16px' }} />
+                  </button>
+                </div>
+                {missingText && (
+                  <p
+                    id="quiz-missing"
+                    aria-live="polite"
                     style={{
-                      width: '20px', height: '20px', marginTop: '2px',
-                      accentColor: '#D4A017', flexShrink: 0, cursor: 'pointer',
+                      fontFamily: 'var(--font-body)', fontSize: '14px', lineHeight: 1.5,
+                      color: submitAttempted ? ERROR : GRAY_TEXT, margin: '12px 0 0 0',
                     }}
-                  />
-                  <span style={{
-                    fontFamily: 'var(--font-body)', fontSize: '12px', color: '#9ca3af',
-                    lineHeight: 1.5,
-                  }}>
-                    {CONSENT_TEXT}
-                  </span>
-                </label>
-
-                {/* Hidden from people; bots that fill it in are ignored */}
-                <input
-                  type="text"
-                  name="company"
-                  tabIndex={-1}
-                  autoComplete="off"
-                  aria-hidden="true"
-                  value={leadForm.company}
-                  onChange={(e) => setLeadForm((f) => ({ ...f, company: e.target.value }))}
-                  style={{ position: 'absolute', left: '-9999px', width: '1px', height: '1px', opacity: 0 }}
-                />
-
-                {submitError && (
-                  <p role="alert" style={{ fontFamily: 'var(--font-body)', fontSize: '14px', color: '#b91c1c', margin: 0 }}>
-                    {submitError}
+                  >
+                    {missingText}
                   </p>
                 )}
-              </div>
-
-              {/* Form Buttons */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '36px' }}>
-                <button
-                  onClick={goBack}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: '8px',
-                    padding: '12px 20px', borderRadius: '10px',
-                    border: '1px solid #e5e7eb', background: '#ffffff',
-                    fontFamily: 'var(--font-heading)', fontWeight: 600, fontSize: '14px',
-                    color: '#6b7280', cursor: 'pointer', transition: 'all 0.2s ease',
-                  }}
-                >
-                  <ArrowLeft style={{ width: '16px', height: '16px' }} />
-                  Back
-                </button>
-                <button
-                  onClick={submitLead}
-                  disabled={!isLeadValid}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: '8px',
-                    padding: '14px 28px', borderRadius: '10px',
-                    border: 'none',
-                    background: isLeadValid ? '#D4A017' : '#e5e7eb',
-                    fontFamily: 'var(--font-heading)', fontWeight: 700, fontSize: '15px',
-                    color: isLeadValid ? '#0A1F44' : '#9ca3af',
-                    cursor: isLeadValid ? 'pointer' : 'default',
-                    transition: 'all 0.2s ease',
-                    boxShadow: isLeadValid ? '0 8px 30px -6px rgba(212,160,23,0.35)' : 'none',
-                  }}
-                >
-                  {submitting ? 'Sending…' : 'See My Results'}
-                  <ArrowRight style={{ width: '16px', height: '16px' }} />
-                </button>
-              </div>
+              </form>
             </motion.div>
           )}
 
@@ -485,20 +697,25 @@ export default function QuizPage() {
                   alignItems: 'center', justifyContent: 'center',
                   margin: '0 auto 20px auto',
                 }}>
-                  <Home style={{ width: '28px', height: '28px', color: '#D4A017' }} />
+                  <Home aria-hidden="true" style={{ width: '28px', height: '28px', color: GOLD }} />
                 </div>
-                <h1 style={{
-                  fontFamily: 'var(--font-heading)', fontWeight: 800,
-                  fontSize: 'clamp(1.5rem, 4vw, 2rem)', color: '#0A1F44',
-                  marginBottom: '8px', lineHeight: 1.2,
-                }}>
-                  Your Pathway: {result.title}
+                <h1
+                  ref={headingRef}
+                  tabIndex={-1}
+                  className="quiz-heading"
+                  style={{
+                    fontFamily: 'var(--font-heading)', fontWeight: 800,
+                    fontSize: 'clamp(1.5rem, 4vw, 2rem)', color: NAVY,
+                    marginBottom: '8px', lineHeight: 1.2,
+                  }}
+                >
+                  {firstName ? `Thanks, ${firstName}. Here's where you start.` : 'Here\'s where you start.'}
                 </h1>
                 <p style={{
                   fontFamily: 'var(--font-body)', fontSize: '15px',
-                  color: '#6b7280', lineHeight: 1.6,
+                  color: GRAY_TEXT, lineHeight: 1.6,
                 }}>
-                  Based on your answers, here&rsquo;s your personalized homeownership plan.
+                  Based on your answers, this is your pathway.
                 </p>
               </div>
 
@@ -510,13 +727,13 @@ export default function QuizPage() {
                     borderRadius: '20px', overflow: 'hidden',
                     background: s.cardBg,
                     boxShadow: '0 20px 60px -15px rgba(0,0,0,0.12)',
-                    border: result.color !== 'gold' ? '1px solid #e5e7eb' : 'none',
+                    border: result.color === 'light' ? `1px solid ${BORDER}` : 'none',
                   }}>
                     {/* Top color band */}
                     <div style={{ height: '6px', background: s.bandGradient }} />
 
-                    <div style={{ padding: '40px' }}>
-                      {/* Badge */}
+                    <div style={{ padding: 'clamp(24px, 6vw, 40px)' }}>
+                      {/* Pathway name */}
                       <div style={{
                         display: 'inline-flex', alignItems: 'center', gap: '8px',
                         background: s.badgeBg, color: s.badgeText,
@@ -524,33 +741,52 @@ export default function QuizPage() {
                         letterSpacing: '0.06em', textTransform: 'uppercase' as const,
                         padding: '6px 14px', borderRadius: '999px', marginBottom: '20px',
                       }}>
-                        <span style={{
+                        <span aria-hidden="true" style={{
                           width: '8px', height: '8px', borderRadius: '50%',
                           background: s.dotColor,
                         }} />
-                        Credit: {result.badge}
+                        Your pathway: {result.title}
                       </div>
 
-                      <h2 style={{
-                        fontFamily: 'var(--font-heading)', fontWeight: 700,
-                        fontSize: '24px', color: s.cardText, marginBottom: '12px',
+                      {/* First step */}
+                      <div style={{
+                        background: s.stepBg,
+                        borderRadius: '12px', padding: '20px 22px', marginBottom: '24px',
                       }}>
-                        {result.title}
-                      </h2>
+                        <h2 style={{
+                          fontFamily: 'var(--font-heading)', fontWeight: 700,
+                          fontSize: 'clamp(1.25rem, 3.5vw, 1.5rem)', color: s.cardText,
+                          lineHeight: 1.25, margin: '0 0 8px 0',
+                        }}>
+                          <span style={{ color: s.eyebrowText }}>Your first step:</span> {result.firstStep}
+                        </h2>
+                        <p style={{
+                          fontFamily: 'var(--font-body)', fontSize: '15px',
+                          color: s.descText, lineHeight: 1.6, margin: 0,
+                        }}>
+                          {result.firstStepDetail}
+                        </p>
+                      </div>
 
                       <p style={{
                         fontFamily: 'var(--font-body)', fontSize: '15px',
-                        color: s.descText, lineHeight: 1.7, marginBottom: '28px',
+                        color: s.descText, lineHeight: 1.7, marginBottom: '24px',
                       }}>
                         {result.description}
                       </p>
 
-                      {/* Features */}
-                      <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 28px 0', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      {/* Remaining steps */}
+                      <h3 style={{
+                        fontFamily: 'var(--font-heading)', fontWeight: 700, fontSize: '14px',
+                        color: s.cardText, margin: '0 0 12px 0',
+                      }}>
+                        After that:
+                      </h3>
+                      <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 28px 0', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                         {result.features.map((f) => (
-                          <li key={f} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                            <CheckCircle2 style={{ width: '18px', height: '18px', color: s.checkColor, flexShrink: 0 }} />
-                            <span style={{ fontFamily: 'var(--font-body)', fontSize: '14px', color: s.featureText }}>
+                          <li key={f} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                            <CheckCircle2 aria-hidden="true" style={{ width: '16px', height: '16px', marginTop: '2px', color: s.checkColor, flexShrink: 0 }} />
+                            <span style={{ fontFamily: 'var(--font-body)', fontSize: '14px', color: s.featureText, lineHeight: 1.5 }}>
                               {f}
                             </span>
                           </li>
@@ -560,7 +796,7 @@ export default function QuizPage() {
                       {/* What happens next */}
                       <p style={{
                         fontFamily: 'var(--font-body)', fontSize: '15px', fontWeight: 600,
-                        color: s.timelineText, marginBottom: '28px',
+                        color: s.timelineText, lineHeight: 1.6, marginBottom: '28px',
                       }}>
                         {result.timeline}
                       </p>
@@ -568,9 +804,10 @@ export default function QuizPage() {
                       {/* CTA */}
                       <Link
                         href={result.ctaHref}
+                        className={FOCUS_RING}
                         style={{
                           display: 'inline-flex', alignItems: 'center', gap: '10px',
-                          padding: '16px 32px', borderRadius: '12px',
+                          minHeight: '48px', padding: '14px 28px', borderRadius: '12px',
                           background: s.ctaBg, color: s.ctaText,
                           fontFamily: 'var(--font-heading)', fontWeight: 700, fontSize: '15px',
                           textDecoration: 'none',
@@ -579,29 +816,24 @@ export default function QuizPage() {
                         }}
                       >
                         {result.cta}
-                        <ArrowRight style={{ width: '16px', height: '16px' }} />
+                        <ArrowRight aria-hidden="true" style={{ width: '16px', height: '16px' }} />
                       </Link>
                     </div>
                   </div>
                 );
               })()}
 
-              {/* Retake */}
-              <div style={{ textAlign: 'center', marginTop: '32px' }}>
+              {/* Retake (resets this page only; nothing is sent again) */}
+              <div style={{ textAlign: 'center', marginTop: '24px' }}>
                 <button
-                  onClick={() => {
-                    setStep(0);
-                    setAnswers({});
-                    setLeadForm({ name: '', email: '', phone: '', company: '' });
-                    setTcpaChecked(false);
-                    setResult(null);
-                    setDirection(-1);
-                    setPhase('quiz');
-                  }}
+                  type="button"
+                  onClick={retake}
+                  className={FOCUS_RING}
                   style={{
+                    minHeight: '44px', padding: '10px 16px',
                     background: 'none', border: 'none', cursor: 'pointer',
                     fontFamily: 'var(--font-heading)', fontWeight: 600, fontSize: '14px',
-                    color: '#9ca3af', textDecoration: 'underline',
+                    color: GRAY_TEXT, textDecoration: 'underline',
                     textUnderlineOffset: '3px',
                   }}
                 >

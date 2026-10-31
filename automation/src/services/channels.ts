@@ -6,6 +6,7 @@ import { env, getConfig } from '../config';
 import type { EmailContent, Outreach } from '../content/messages';
 import { renderEmail } from '../content/email-template';
 import type { Lead } from '../types';
+import { isBlockedPhone } from '../lib/phone';
 import { nextContactWindow, nowIso } from '../lib/time';
 import { logActivity, updateLead } from './db';
 import { scheduleJob } from './scheduler';
@@ -39,6 +40,7 @@ async function markContacted(lead: Lead) {
 export async function sendEmail(lead: Lead, content: EmailContent, label: string): Promise<Result> {
   const cfg = getConfig();
   if (!cfg.email.enabled) return skip(lead, 'email', label, 'client email is turned off');
+  if (!lead.consent) return skip(lead, 'email', label, 'no consent on record');
   if (!lead.email) return skip(lead, 'email', label, 'no email address');
   if (lead.emailOptOut) return skip(lead, 'email', label, 'client unsubscribed');
 
@@ -67,7 +69,8 @@ export async function sendEmail(lead: Lead, content: EmailContent, label: string
 export async function sendSms(lead: Lead, message: string, label: string, opts: { immediate?: boolean } = {}): Promise<Result> {
   const cfg = getConfig();
   if (!cfg.sms.originationIdentity) return skip(lead, 'sms', label, 'SMS not configured yet');
-  if (!lead.phone) return skip(lead, 'sms', label, 'no valid mobile number');
+  if (!lead.consent) return skip(lead, 'sms', label, 'no consent on record');
+  if (!lead.phone || isBlockedPhone(lead.phone)) return skip(lead, 'sms', label, 'no valid US mobile number');
   if (lead.smsOptOut) return skip(lead, 'sms', label, 'client opted out of texts');
   // Replies to a client's own text are conversational and can go out right away.
   if (!opts.immediate && (await deferIfQuietHours(lead, 'sms', message, label))) return 'deferred';
@@ -118,7 +121,8 @@ function getVoiceSetup(): Promise<VoiceSetup | undefined> {
  * (Lex + Claude), which looks up the lead to know which step they are on.
  */
 export async function placeCall(lead: Lead, script: string, label: string): Promise<Result> {
-  if (!lead.phone) return skip(lead, 'call', label, 'no valid phone number');
+  if (!lead.consent) return skip(lead, 'call', label, 'no consent on record');
+  if (!lead.phone || isBlockedPhone(lead.phone)) return skip(lead, 'call', label, 'no valid US phone number');
   if (lead.callOptOut) return skip(lead, 'call', label, 'client asked not to be called');
   let setup: VoiceSetup | undefined;
   try {

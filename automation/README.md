@@ -26,6 +26,34 @@ Each step sends its call, text, and email, then waits until the milestone is rep
 or by other systems calling `POST /integrations/milestones` with the API key. Calls and texts only go out between
 9am and 8pm Eastern; anything outside that window is held until the next morning.
 
+## Consent and safeguards
+
+Calls, texts, and emails only go to leads with a consent record (`lead.consent`); without one, every send is skipped
+and logged as "no consent on record", and the new-lead staff alert says so. Where consent comes from:
+
+| Intake | Consent recorded from |
+|---|---|
+| Website forms (`POST /public/leads`) | Required: `consent: true` + `consentText`, with time, IP, and browser |
+| Staff dashboard (`POST /staff/leads`) | Required: the consent checkbox, recorded as "Verbal or written consent recorded by <staff>" |
+| Integrations (`POST /integrations/leads`) | Optional `consent: { text, at }` (or the older `consentText`, recorded as now) |
+| Facebook lead ads | A custom disclaimer on the form with every checkbox checked (`custom_disclaimer_responses`) |
+| Google Ads lead forms | Only a custom question whose name mentions consent/agree/disclaimer, answered yes. Google has no standard consent field, so most Google leads arrive without consent and get staff follow-up only |
+
+Other safeguards:
+
+- **Phone numbers**: only US numbers (incl. Puerto Rico, USVI, Guam, CNMI, American Samoa). Premium (900, 976),
+  N11, 5XX/600/700/710, Canadian, and Caribbean area codes are never called or texted (`src/lib/phone.ts`).
+- **Public form**: a repeat submission with the same phone or email doesn't create a lead or restart the journey
+  (it's noted on the existing lead). API Gateway throttles `POST /public/leads` to 2/s (burst 5), and a WAF rule blocks
+  any IP that sends more than 20 requests to `/public/*` in 5 minutes.
+- **Opt-outs**: STOP-type keywords stop texts *and* calls; START restores both. Clear phrases like "stop calling",
+  "don't text me", or "remove me" (by text or on a call) are honored directly, without the AI.
+- **Costs**: the AI answers at most 20 texts per client per day (Eastern); staff are told once when the limit is hit.
+- **No double sends**: retried journey steps, scheduled sends, and redelivered texts/webhooks are deduplicated with
+  send-once markers in the Leads table (`once#…` items, removed automatically by DynamoDB TTL on `expiresAt`).
+- **Failures**: if a journey step keeps failing after retries, staff get "Journey stopped with an error" and that
+  client's journey ends. If a journey can't start, the lead is still saved and staff are alerted.
+
 ## Before going live
 
 1. **Fill in `config.json`**: the five program links, mailing address, staff list, and sender email.

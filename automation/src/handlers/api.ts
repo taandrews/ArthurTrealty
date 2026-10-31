@@ -1,15 +1,17 @@
 import type { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
-import { createHmac, timingSafeEqual } from 'node:crypto';
-import { toE164 } from '../lib/phone';
+import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
+import { toE164, toUsPhone } from '../lib/phone';
 import {
-  BadRequestError, NotFoundError, findLeadByEmail, findLeadByPhone, listActivity, logActivity,
-  mustGetLead, scanLeads, updateLead,
+  BadRequestError, NotFoundError, claimOnce, findLeadByEmail, findLeadByPhone, listActivity, logActivity,
+  mustGetLead, releaseOnce, scanLeads, updateLead,
 } from '../services/db';
-import { createLead, recordMilestone, updateFunds, type MilestoneData } from '../services/journey';
+import { cleanName, createLead, recordMilestone, updateFunds, type MilestoneData } from '../services/journey';
 import { computeKpis } from '../services/kpis';
+import { notifyManagers, notifyStaff } from '../services/notify';
 import { getSecrets, verifyUnsubscribe } from '../services/secrets';
 import { LEAD_SOURCES, MILESTONE_TYPES, type Funds, type Lead, type LeadSource, type MilestoneType } from '../types';
-import { nowIso } from '../lib/time';
+import { localDate, nowIso } from '../lib/time';
+import { getConfig } from '../config';
 
 type Body = Record<string, any>;
 interface Req {
@@ -81,7 +83,9 @@ function match(pattern: string, path: string): Record<string, string> | undefine
   if (p.length !== a.length) return undefined;
   const params: Record<string, string> = {};
   for (let i = 0; i < p.length; i++) {
-    if (p[i].startsWith(':')) params[p[i].slice(1)] = decodeURIComponent(a[i]);
+    if (p[i].startsWith(':')) {
+      try { params[p[i].slice(1)] = decodeURIComponent(a[i]); } catch { throw new BadRequestError('Bad path'); }
+    }
     else if (p[i] !== a[i]) return undefined;
   }
   return params;
@@ -111,6 +115,13 @@ function str(v: unknown, max = 200): string | undefined {
   return typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : undefined;
 }
 
+/** Constant-time string comparison (hashing first hides the length too). */
+function safeEqual(given: unknown, expected: string): boolean {
+  if (typeof given !== 'string') return false;
+  const hash = (v: string) => createHash('sha256').update(v).digest();
+  return timingSafeEqual(hash(given), hash(expected));
+}
+
 function splitName(full: string): { firstName: string; lastName: string } {
   const parts = full.trim().split(/\s+/);
   return { firstName: parts[0] ?? '', lastName: parts.slice(1).join(' ') };
@@ -134,11 +145,19 @@ async function websiteLead(req: Req) {
   if (str(b.company)) return { ok: true };
   if (b.consent !== true || !str(b.consentText, 1000)) throw new BadRequestError('Consent is required');
   const { firstName, lastName } = splitName(str(b.name) ?? '');
+  // A repeat submission (same phone or email) doesn't start a second journey, and the response doesn't say so.
+  const phone = toUsPhone(str(b.phone));
+  const email = str(b.email)?.toLowerCase();
+  const existing = (phone ? await findLeadByPhone(phone) : undefined) ?? (email ? await findLeadByEmail(email) : undefined);
+  if (existing) {
+    await noteResubmission(existing, str(b.interest, 100));
+    return { ok: true };
+  }
   const quiz = typeof b.answers === 'object' && b.answers
     ? Object.fromEntries(Object.entries(b.answers).slice(0, 20).map(([k, v]) => [k.slice(0, 50), String(v).slice(0, 100)]))
     : undefined;
-  const lead = await createLead({
-    firstName, lastName, email: str(b.email), phone: str(b.phone), source: 'website', quiz,
+  await createLead({
+    firstName, lastName, email, phone: str(b.phone), source: 'website', quiz,
     // Which page's form it came from (e.g. "rent-to-own", "contact") and the visitor's message, if any
     sourceDetail: str(b.interest, 100), notes: str(b.message, 2000),
     consent: {
@@ -148,7 +167,16 @@ async function websiteLead(req: Req) {
       userAgent: req.event.headers?.['User-Agent'] ?? req.event.headers?.['user-agent'],
     },
   });
-  return { ok: true, leadId: lead.leadId };
+  return { ok: true };
+}
+
+/** Logged on the existing lead. Staff hear about it (once a day) only if the client had left the program. */
+async function noteResubmission(lead: Lead, interest: string | undefined) {
+  await logActivity({ leadId: lead.leadId, kind: 'note', summary: `Submitted the website form again${interest ? ` (${interest})` : ''}` });
+  if (lead.status === 'active' || lead.status === 'mortgage_ready') return;
+  if (await claimOnce(`resubmit#${lead.leadId}#${localDate(new Date(), getConfig().timeZone)}`, 2)) {
+    await notifyStaff(lead, 'Former client submitted the website form again', [`Status: ${lead.status}`]);
+  }
 }
 
 async function unsubscribe(req: Req) {
@@ -170,9 +198,20 @@ async function integrationLead(req: Req) {
   const lead = await createLead({
     ...names, email: str(b.email), phone: str(b.phone), source,
     sourceDetail: str(b.sourceDetail), notes: str(b.notes, 2000),
-    consent: str(b.consentText, 1000) ? { text: str(b.consentText, 1000)!, at: nowIso() } : undefined,
+    consent: integrationConsent(b),
   });
   return { ok: true, leadId: lead.leadId };
+}
+
+/** `consent: { text, at }` (what the client agreed to, and when), or the older `consentText` (recorded as now). */
+function integrationConsent(b: Body): Lead['consent'] {
+  if (b.consent !== undefined && b.consent !== null) {
+    const text = typeof b.consent === 'object' ? str(b.consent.text, 1000) : undefined;
+    const at = typeof b.consent === 'object' ? str(b.consent.at, 100) : undefined;
+    if (!text || !at || Number.isNaN(Date.parse(at))) throw new BadRequestError('consent must be { text, at } with at as a date');
+    return { text, at: new Date(at).toISOString() };
+  }
+  return str(b.consentText, 1000) ? { text: str(b.consentText, 1000)!, at: nowIso() } : undefined;
 }
 
 /** For outside systems (credit monitoring, loan platform, calendar) that know the client's email or phone, not our ID. */
@@ -193,21 +232,37 @@ async function integrationMilestone(req: Req) {
 async function googleAdsWebhook(req: Req) {
   const b = req.body;
   const { googleAdsKey } = await getSecrets();
-  if (!googleAdsKey || b.google_key !== googleAdsKey) throw new ForbiddenError('Invalid key');
+  if (!googleAdsKey || !safeEqual(b.google_key, googleAdsKey)) throw new ForbiddenError('Invalid key');
   if (b.is_test) return {};
-  const col = (id: string) =>
-    (b.user_column_data as { column_id: string; string_value: string }[] | undefined)?.find((c) => c.column_id === id)?.string_value;
-  const names = col('FIRST_NAME') ? { firstName: col('FIRST_NAME')!, lastName: col('LAST_NAME') ?? '' } : splitName(col('FULL_NAME') ?? '');
+  if (!Array.isArray(b.user_column_data)) throw new BadRequestError('user_column_data must be a list');
+  const columns = b.user_column_data as GoogleColumn[];
+  const col = (id: string) => str(columns.find((c) => c?.column_id === id)?.string_value);
+  let names = col('FIRST_NAME') ? { firstName: col('FIRST_NAME')!, lastName: col('LAST_NAME') ?? '' } : splitName(col('FULL_NAME') ?? '');
+  // Name is optional on some Google forms; keep the lead rather than reject it.
+  if (!cleanName(names.firstName)) names = { firstName: 'Google lead', lastName: '' };
   await createLead({
     ...names, email: col('EMAIL'), phone: col('PHONE_NUMBER'), source: 'google_ads',
     sourceDetail: [b.campaign_id && `campaign ${b.campaign_id}`, b.lead_id && `lead ${b.lead_id}`].filter(Boolean).join(', ') || undefined,
+    consent: googleConsent(columns),
   });
   return {};
 }
 
+interface GoogleColumn { column_id?: string; column_name?: string; string_value?: string }
+
+/**
+ * Google lead forms have no standard consent column. If the advertiser added a custom question about
+ * consent (its name mentions consent, agree, or disclaimer) and the answer is yes, that answer is the record.
+ */
+function googleConsent(columns: GoogleColumn[]): Lead['consent'] {
+  const c = columns.find((c) => /consent|agree|disclaimer/i.test(`${c?.column_name ?? ''} ${c?.column_id ?? ''}`));
+  if (!c || !/^(yes|y|true|i agree|agree|accepted|checked)\b/i.test(c.string_value?.trim() ?? '')) return undefined;
+  return { text: `Google lead form: "${str(c.column_name ?? c.column_id, 500)}" answered "${str(c.string_value, 100)}"`, at: nowIso() };
+}
+
 async function facebookVerify(req: Req) {
   const { facebookVerifyToken } = await getSecrets();
-  if (req.query['hub.mode'] === 'subscribe' && facebookVerifyToken && req.query['hub.verify_token'] === facebookVerifyToken) {
+  if (req.query['hub.mode'] === 'subscribe' && facebookVerifyToken && safeEqual(req.query['hub.verify_token'], facebookVerifyToken)) {
     return req.query['hub.challenge'] ?? '';
   }
   throw new ForbiddenError('Verification failed');
@@ -221,25 +276,52 @@ async function facebookWebhook(req: Req) {
   const given = Buffer.from(header);
   if (expected.length !== given.length || !timingSafeEqual(expected, given)) throw new ForbiddenError('Bad signature');
 
-  for (const entry of req.body.entry ?? []) {
-    for (const change of entry.changes ?? []) {
-      if (change.field !== 'leadgen') continue;
-      const leadgenId = change.value?.leadgen_id;
-      const res = await fetch(`https://graph.facebook.com/v21.0/${encodeURIComponent(leadgenId)}?access_token=${encodeURIComponent(facebookPageAccessToken)}`);
-      if (!res.ok) {
-        console.error('Facebook lead fetch failed', res.status, await res.text());
-        continue;
+  // Each lead is handled on its own: one that fails is reported to staff and doesn't block the rest.
+  for (const entry of Array.isArray(req.body.entry) ? req.body.entry : []) {
+    for (const change of Array.isArray(entry?.changes) ? entry.changes : []) {
+      if (change?.field !== 'leadgen' || !change.value?.leadgen_id) continue;
+      const leadgenId = String(change.value.leadgen_id).slice(0, 100);
+      const formId = String(change.value.form_id ?? '').slice(0, 100);
+      // Facebook redelivers webhooks; the marker keeps a redelivery from creating the lead twice.
+      const marker = `facebook#${leadgenId}`;
+      if (!(await claimOnce(marker, 30))) continue;
+      try {
+        await facebookLead(leadgenId, formId, facebookPageAccessToken);
+      } catch (err) {
+        console.error(`Facebook lead ${leadgenId} failed`, err);
+        await releaseOnce(marker).catch((e) => console.error('Releasing marker failed', e));
+        await notifyManagers('Facebook lead could not be saved', [
+          `Facebook lead ID: ${leadgenId}`, `Form: ${formId || 'unknown'}`,
+          `Error: ${err instanceof Error ? err.message : String(err)}`,
+          'Download it from Meta Leads Center and add it in the staff dashboard.',
+        ]);
       }
-      const data = (await res.json()) as { field_data?: { name: string; values: string[] }[] };
-      const field = (name: string) => data.field_data?.find((f) => f.name === name)?.values?.[0];
-      const names = field('first_name') ? { firstName: field('first_name')!, lastName: field('last_name') ?? '' } : splitName(field('full_name') ?? '');
-      await createLead({
-        ...names, email: field('email'), phone: field('phone_number'), source: 'facebook',
-        sourceDetail: `form ${change.value?.form_id ?? ''}, lead ${leadgenId}`,
-      });
     }
   }
   return {};
+}
+
+async function facebookLead(leadgenId: string, formId: string, accessToken: string): Promise<void> {
+  const fields = 'created_time,field_data,custom_disclaimer_responses';
+  const res = await fetch(`https://graph.facebook.com/v21.0/${encodeURIComponent(leadgenId)}?fields=${fields}&access_token=${encodeURIComponent(accessToken)}`);
+  if (!res.ok) throw new Error(`Graph API ${res.status}: ${(await res.text()).slice(0, 300)}`);
+  const data = (await res.json()) as {
+    created_time?: string;
+    field_data?: { name: string; values: string[] }[];
+    custom_disclaimer_responses?: { checkbox_key?: string; is_checked?: string | boolean }[];
+  };
+  const field = (name: string) => data.field_data?.find((f) => f.name === name)?.values?.[0];
+  const names = field('first_name') ? { firstName: field('first_name')!, lastName: field('last_name') ?? '' } : splitName(field('full_name') ?? '');
+  // A custom disclaimer with checkboxes on the form is the consent record, if every box was checked.
+  const boxes = data.custom_disclaimer_responses ?? [];
+  const agreed = boxes.length > 0 && boxes.every((r) => r.is_checked === true || r.is_checked === '1' || r.is_checked === 'true');
+  const at = data.created_time && !Number.isNaN(Date.parse(data.created_time)) ? new Date(data.created_time).toISOString() : nowIso();
+  const keys = boxes.map((r) => r.checkbox_key).filter(Boolean).join(', ') || 'checkbox';
+  await createLead({
+    ...names, email: field('email'), phone: field('phone_number'), source: 'facebook',
+    sourceDetail: `form ${formId}, lead ${leadgenId}`,
+    consent: agreed ? { text: `Facebook lead form custom disclaimer accepted (${keys})`, at } : undefined,
+  });
 }
 
 /* ——— Staff ——— */

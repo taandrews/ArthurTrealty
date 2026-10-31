@@ -1,6 +1,6 @@
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import {
-  DynamoDBDocumentClient, GetCommand, PutCommand, QueryCommand, ScanCommand, UpdateCommand,
+  DeleteCommand, DynamoDBDocumentClient, GetCommand, PutCommand, QueryCommand, ScanCommand, UpdateCommand,
 } from '@aws-sdk/lib-dynamodb';
 import { env } from '../config';
 import type { Lead } from '../types';
@@ -117,6 +117,53 @@ export async function nextAssignmentIndex(): Promise<number> {
     ReturnValues: 'UPDATED_NEW',
   }));
   return Number(res.Attributes?.counter ?? 1) - 1;
+}
+
+/* ——— Markers and counters (non-lead items in the Leads table) ——— */
+
+/**
+ * Marker items share the Leads table under a prefixed key. Their entity isn't "lead", so getLead and
+ * scanLeads (staff list, KPIs, daily jobs) ignore them, and DynamoDB deletes them after `expiresAt`.
+ */
+export function markerItem(kind: 'once' | 'count', key: string, ttlDays: number, now = Date.now()) {
+  return { leadId: `${kind}#${key}`, entity: kind, expiresAt: Math.floor(now / 1000) + Math.round(ttlDays * 86400) };
+}
+
+/**
+ * True the first time it's called with `key`, false after that (until the marker expires).
+ * Used so retried Lambda invocations don't send the same call, text, or email twice.
+ */
+export async function claimOnce(key: string, ttlDays = 7): Promise<boolean> {
+  try {
+    await ddb.send(new PutCommand({
+      TableName: env.leadsTable,
+      Item: markerItem('once', key, ttlDays),
+      ConditionExpression: 'attribute_not_exists(leadId)',
+    }));
+    return true;
+  } catch (err) {
+    if ((err as Error).name === 'ConditionalCheckFailedException') return false;
+    throw err;
+  }
+}
+
+/** Undo claimOnce when the work failed before anything was sent, so a retry can do it. */
+export async function releaseOnce(key: string): Promise<void> {
+  await ddb.send(new DeleteCommand({ TableName: env.leadsTable, Key: { leadId: `once#${key}` } }));
+}
+
+/** Add one to a counter and return the new value. */
+export async function incrementCounter(key: string, ttlDays = 2): Promise<number> {
+  const { leadId, entity, expiresAt } = markerItem('count', key, ttlDays);
+  const res = await ddb.send(new UpdateCommand({
+    TableName: env.leadsTable,
+    Key: { leadId },
+    UpdateExpression: 'ADD #c :one SET #e = :e, #x = if_not_exists(#x, :x)',
+    ExpressionAttributeNames: { '#c': 'counter', '#e': 'entity', '#x': 'expiresAt' },
+    ExpressionAttributeValues: { ':one': 1, ':e': entity, ':x': expiresAt },
+    ReturnValues: 'UPDATED_NEW',
+  }));
+  return Number(res.Attributes?.counter ?? 1);
 }
 
 /* ——— Activity log ——— */

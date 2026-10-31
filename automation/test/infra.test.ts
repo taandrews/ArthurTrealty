@@ -1,5 +1,5 @@
 import { App } from 'aws-cdk-lib';
-import { Template } from 'aws-cdk-lib/assertions';
+import { Match, Template } from 'aws-cdk-lib/assertions';
 import { describe, expect, it } from 'vitest';
 import config from '../config.json';
 import { ArthurTRealtyStack } from '../infra/stack';
@@ -73,6 +73,30 @@ describe('infrastructure', () => {
     expect(content).toContain('ConnectParticipantWithLexBot');
     expect(content).toContain('$.Attributes.message');
     expect(content).toContain('$.Attributes.leadId');
+  });
+
+  it('limits the public lead form: per-method throttle and a WAF rate rule on the API stage', () => {
+    template.hasResourceProperties('AWS::ApiGateway::Stage', {
+      MethodSettings: Match.arrayWith([Match.objectLike({ HttpMethod: 'POST', ResourcePath: '/~1public~1leads', ThrottlingRateLimit: 2, ThrottlingBurstLimit: 5 })]),
+    });
+    template.hasResourceProperties('AWS::WAFv2::WebACL', {
+      Scope: 'REGIONAL',
+      Rules: [Match.objectLike({ Statement: { RateBasedStatement: Match.objectLike({ Limit: 20, EvaluationWindowSec: 300, AggregateKeyType: 'IP' }) } })],
+    });
+    template.resourceCountIs('AWS::WAFv2::WebACLAssociation', 1);
+  });
+
+  it('expires send-once markers with DynamoDB TTL', () => {
+    template.hasResourceProperties('AWS::DynamoDB::GlobalTable', { TimeToLiveSpecification: { AttributeName: 'expiresAt', Enabled: true } });
+  });
+
+  it('retries journey steps and alerts staff when one keeps failing', () => {
+    const [sm] = Object.values(template.findResources('AWS::StepFunctions::StateMachine')) as any[];
+    const def = JSON.stringify(sm.Properties.DefinitionString);
+    expect(def).toContain('States.TaskFailed');
+    expect(def).toContain('Lambda.TooManyRequestsException');
+    expect(def).toContain('Journey Error');
+    expect(def).toContain('$$.State.EnteredTime');
   });
 
   it('lets the main functions place calls in the voice region', () => {

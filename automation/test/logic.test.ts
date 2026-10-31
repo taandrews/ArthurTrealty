@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { toE164 } from '../src/lib/phone';
-import { nextContactWindow } from '../src/lib/time';
+import { detectOptOut } from '../src/lib/opt-out';
+import { isBlockedPhone, toE164, toUsPhone } from '../src/lib/phone';
+import { localDate, nextContactWindow } from '../src/lib/time';
+import { markerItem } from '../src/services/db';
 import { parseAmount, parseYesNo } from '../src/services/conversation';
 import { computeKpis } from '../src/services/kpis';
 import { PHASES, phaseCompletedBy } from '../src/phases';
@@ -16,6 +18,70 @@ describe('toE164', () => {
     expect(toE164('555-1234')).toBeUndefined();
     expect(toE164('')).toBeUndefined();
     expect(toE164(undefined)).toBeUndefined();
+  });
+});
+
+describe('service-area phone numbers', () => {
+  it('allows US numbers, including Maryland and US territories', () => {
+    expect(toUsPhone('(410) 555-1234')).toBe('+14105551234');
+    expect(toUsPhone('443-555-0102')).toBe('+14435550102');
+    expect(toUsPhone('787 555 1234')).toBe('+17875551234'); // Puerto Rico
+    expect(toUsPhone('671 555 1234')).toBe('+16715551234'); // Guam
+  });
+  it('blocks premium, non-geographic, and N11 codes', () => {
+    for (const area of ['900', '976', '500', '521', '533', '588', '600', '700', '710', '211', '411', '911']) {
+      expect(isBlockedPhone(`+1${area}5551234`), area).toBe(true);
+    }
+  });
+  it('blocks Canada and the Caribbean', () => {
+    for (const area of ['416', '604', '905', '876', '809', '242', '441']) {
+      expect(toUsPhone(`${area}-555-1234`), area).toBeUndefined();
+    }
+  });
+  it('blocks malformed NANP numbers', () => {
+    expect(isBlockedPhone('+11105551234')).toBe(true); // area code starts with 1
+    expect(isBlockedPhone('+14100551234')).toBe(true); // exchange starts with 0
+    expect(isBlockedPhone('+4420555512')).toBe(true);
+    expect(toUsPhone(undefined)).toBeUndefined();
+  });
+});
+
+describe('opt-out phrases', () => {
+  it('recognizes requests to stop calls', () => {
+    expect(detectOptOut('Please stop calling me')).toBe('calls');
+    expect(detectOptOut("don't call me anymore")).toBe('calls');
+    expect(detectOptOut('Do not call this number')).toBe('calls');
+  });
+  it('recognizes requests to stop texts', () => {
+    expect(detectOptOut('stop texting me')).toBe('texts');
+    expect(detectOptOut('Don’t text me')).toBe('texts');
+  });
+  it('treats remove/unsubscribe/stop contacting, or both channels, as all contact', () => {
+    expect(detectOptOut('remove me from your list')).toBe('all');
+    expect(detectOptOut('take me off this')).toBe('all');
+    expect(detectOptOut('unsubscribe')).toBe('all');
+    expect(detectOptOut('stop contacting me')).toBe('all');
+    expect(detectOptOut('stop calling and texting')).toBe('all');
+  });
+  it('ignores ordinary messages', () => {
+    expect(detectOptOut('Can you call me tomorrow?')).toBeUndefined();
+    expect(detectOptOut('I will text you the documents')).toBeUndefined();
+    expect(detectOptOut('yes')).toBeUndefined();
+  });
+});
+
+describe('send-once markers', () => {
+  it('are keyed apart from leads, are not lead entities, and expire', () => {
+    const now = Date.parse('2026-10-30T12:00:00Z');
+    const m = markerItem('once', 'journey#ATR-1#smart_credit#2026-10-30T12:00:00Z', 7, now);
+    expect(m.leadId).toBe('once#journey#ATR-1#smart_credit#2026-10-30T12:00:00Z');
+    expect(m.entity).not.toBe('lead');
+    expect(m.expiresAt).toBe(now / 1000 + 7 * 86400);
+    expect(markerItem('count', 'sms-replies#ATR-1#2026-10-30', 2, now).leadId).toBe('count#sms-replies#ATR-1#2026-10-30');
+  });
+  it('uses the Eastern calendar date for daily counters', () => {
+    expect(localDate(new Date('2026-10-31T03:30:00Z'), 'America/New_York')).toBe('2026-10-30'); // 11:30pm EDT
+    expect(localDate(new Date('2026-10-31T04:30:00Z'), 'America/New_York')).toBe('2026-10-31');
   });
 });
 

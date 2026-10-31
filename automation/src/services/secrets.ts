@@ -18,7 +18,11 @@ let cached: Promise<Secrets> | undefined;
 export function getSecrets(): Promise<Secrets> {
   cached ??= client
     .send(new GetSecretValueCommand({ SecretId: env.secretArn }))
-    .then((res) => JSON.parse(res.SecretString ?? '{}') as Secrets);
+    .then((res) => JSON.parse(res.SecretString ?? '{}') as Secrets)
+    .catch((err) => {
+      cached = undefined; // retry on the next call
+      throw err;
+    });
   return cached;
 }
 
