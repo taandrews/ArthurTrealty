@@ -1,5 +1,7 @@
 import { CfnOutput, Duration, Fn, RemovalPolicy, Stack, type StackProps } from 'aws-cdk-lib';
 import * as connect from 'aws-cdk-lib/aws-connect';
+import * as events from 'aws-cdk-lib/aws-events';
+import * as targets from 'aws-cdk-lib/aws-events-targets';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import { NodejsFunction } from 'aws-cdk-lib/aws-lambda-nodejs';
@@ -10,7 +12,7 @@ import type { Construct } from 'constructs';
 import { createHash } from 'node:crypto';
 import * as path from 'node:path';
 import type { AppConfig } from '../src/config';
-import { VOICE_PARAMETER } from '../src/services/channels';
+import { VOICE_NUMBER_PARAMETER, VOICE_PARAMETER } from '../src/services/channels';
 import type { SharedData } from './stack';
 
 export interface VoiceStackProps extends StackProps {
@@ -191,6 +193,44 @@ export class VoiceStack extends Stack {
         flowId: Fn.select(3, Fn.split('/', flow.attrContactFlowArn)),
         phoneNumber: phone.attrAddress,
       }),
+    });
+
+    /* ——— Maryland number watcher ——— */
+    // AWS had no 410/443 numbers to claim. Every hour this claims one if it appears and makes it the caller ID.
+
+    const watchFn = new NodejsFunction(this, 'NumberWatchFn', {
+      entry: path.join(__dirname, '../src/handlers/number-watch.ts'),
+      handler: 'handler',
+      runtime: lambda.Runtime.NODEJS_22_X,
+      architecture: lambda.Architecture.ARM_64,
+      timeout: Duration.minutes(2),
+      environment: {
+        INSTANCE_ARN: instance.attrArn,
+        INSTANCE_ID: instance.attrId,
+        FLOW_ID: Fn.select(3, Fn.split('/', flow.attrContactFlowArn)),
+      },
+      logGroup: new logs.LogGroup(this, 'NumberWatchLogs', {
+        retention: logs.RetentionDays.THREE_MONTHS,
+        removalPolicy: RemovalPolicy.DESTROY,
+      }),
+      bundling: { minify: true, sourceMap: true, target: 'node22' },
+      projectRoot: path.join(__dirname, '..'),
+      depsLockFilePath: path.join(__dirname, '../package-lock.json'),
+    });
+    watchFn.addToRolePolicy(new iam.PolicyStatement({
+      actions: [
+        'connect:SearchAvailablePhoneNumbers', 'connect:ClaimPhoneNumber', 'connect:ListPhoneNumbersV2',
+        'connect:DescribePhoneNumber', 'connect:AssociatePhoneNumberContactFlow',
+      ],
+      resources: [instance.attrArn, `${instance.attrArn}/*`, `arn:aws:connect:${this.region}:${this.account}:phone-number/*`],
+    }));
+    watchFn.addToRolePolicy(new iam.PolicyStatement({
+      actions: ['ssm:PutParameter'],
+      resources: [`arn:aws:ssm:${this.region}:${this.account}:parameter${VOICE_NUMBER_PARAMETER}`],
+    }));
+    new events.Rule(this, 'NumberWatchSchedule', {
+      schedule: events.Schedule.rate(Duration.hours(1)),
+      targets: [new targets.LambdaFunction(watchFn)],
     });
 
     new CfnOutput(this, 'AssistantPhoneNumber', { value: phone.attrAddress });

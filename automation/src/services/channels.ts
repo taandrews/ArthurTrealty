@@ -1,7 +1,7 @@
 import { ConnectClient, StartOutboundVoiceContactCommand } from '@aws-sdk/client-connect';
 import { PinpointSMSVoiceV2Client, SendTextMessageCommand } from '@aws-sdk/client-pinpoint-sms-voice-v2';
 import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2';
-import { GetParameterCommand, SSMClient } from '@aws-sdk/client-ssm';
+import { GetParametersCommand, SSMClient } from '@aws-sdk/client-ssm';
 import { env, getConfig } from '../config';
 import type { EmailContent, Outreach } from '../content/messages';
 import { renderEmail } from '../content/email-template';
@@ -90,12 +90,21 @@ export async function sendSms(lead: Lead, message: string, label: string, opts: 
 
 /** Published by the voice stack as an SSM parameter in Connect's region. */
 export const VOICE_PARAMETER = '/arthur-t-realty/voice';
+/** Set by the number watcher once it claims a Maryland number; overrides the caller ID in VOICE_PARAMETER. */
+export const VOICE_NUMBER_PARAMETER = '/arthur-t-realty/voice-number';
 interface VoiceSetup { instanceId: string; flowId: string; phoneNumber: string }
 let voiceSetup: Promise<VoiceSetup | undefined> | undefined;
 
 function getVoiceSetup(): Promise<VoiceSetup | undefined> {
-  voiceSetup ??= ssm.send(new GetParameterCommand({ Name: VOICE_PARAMETER }))
-    .then((res) => JSON.parse(res.Parameter?.Value ?? '{}') as VoiceSetup)
+  voiceSetup ??= ssm.send(new GetParametersCommand({ Names: [VOICE_PARAMETER, VOICE_NUMBER_PARAMETER] }))
+    .then((res) => {
+      const value = (name: string) => res.Parameters?.find((p) => p.Name === name)?.Value;
+      const setup = value(VOICE_PARAMETER);
+      if (!setup) return undefined;
+      const parsed = JSON.parse(setup) as VoiceSetup;
+      const maryland = value(VOICE_NUMBER_PARAMETER);
+      return maryland ? { ...parsed, phoneNumber: maryland } : parsed;
+    })
     .catch((err) => {
       if ((err as Error).name === 'ParameterNotFound') return undefined;
       voiceSetup = undefined; // retry on the next call

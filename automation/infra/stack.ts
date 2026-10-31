@@ -16,7 +16,7 @@ import * as sfn from 'aws-cdk-lib/aws-stepfunctions';
 import type { Construct } from 'constructs';
 import * as path from 'node:path';
 import type { AppConfig } from '../src/config';
-import { VOICE_PARAMETER } from '../src/services/channels';
+import { VOICE_NUMBER_PARAMETER, VOICE_PARAMETER } from '../src/services/channels';
 import { buildJourneyDefinition } from './journey-definition';
 
 export interface ArthurTRealtyStackProps extends StackProps {
@@ -182,8 +182,8 @@ export class ArthurTRealtyStack extends Stack {
         resources: [`arn:aws:connect:${VOICE_REGION}:${this.account}:instance/*/contact/*`],
       }));
       f.addToRolePolicy(new iam.PolicyStatement({
-        actions: ['ssm:GetParameter'],
-        resources: [`arn:aws:ssm:${VOICE_REGION}:${this.account}:parameter${VOICE_PARAMETER}`],
+        actions: ['ssm:GetParameters'],
+        resources: [VOICE_PARAMETER, VOICE_NUMBER_PARAMETER].map((name) => `arn:aws:ssm:${VOICE_REGION}:${this.account}:parameter${name}`),
       }));
       return f;
     };
