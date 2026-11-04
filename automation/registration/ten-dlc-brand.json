@@ -1,5 +1,5 @@
 {
-  "_about": "US 10DLC brand registration (US_TEN_DLC_BRAND_REGISTRATION). Draft created in AWS as registration-b64bce1dad0b41ea9275ceb364c3e05d (us-east-2). The business street address is private and kept only in that draft. The tax ID (EIN) is entered by the owner directly in the AWS console, never stored here.",
+  "_about": "US 10DLC brand registration (US_TEN_DLC_BRAND_REGISTRATION). Submitted 2026-11-03 for carrier review as registration-b64bce1dad0b41ea9275ceb364c3e05d (us-east-2). The business street address is private and kept only in that draft. The tax ID (EIN) is entered by the owner directly in the AWS console, never stored here.",
   "fields": {
     "companyInfo.companyName": "RMJ ENTERPRISES INC",
     "companyInfo.taxIdIssuingCountry": "US",
@@ -13,7 +13,7 @@
     "contactInfo.dbaName": "Arthur T Realty",
     "contactInfo.vertical": "REAL_ESTATE",
     "contactInfo.website": "https://main.d3c5zstiegwi2m.amplifyapp.com",
-    "contactInfo.supportEmail": "info@arthurtrealty.com (confirm someone checks this inbox)",
+    "contactInfo.supportEmail": "taandrews@init1s.com (temporary; switch to Arthur's email later via an updated version)",
     "contactInfo.supportPhoneNumber": "assistant line: +12104857242 for now; switch to the Maryland number when assigned"
   }
 }
