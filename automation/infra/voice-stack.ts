@@ -230,6 +230,7 @@ export class VoiceStack extends Stack {
     }));
     new events.Rule(this, 'NumberWatchSchedule', {
       schedule: events.Schedule.rate(Duration.hours(1)),
+      enabled: false, // turned off by the owner 2026-11-03
       targets: [new targets.LambdaFunction(watchFn)],
     });
 
