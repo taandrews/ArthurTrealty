@@ -82,7 +82,7 @@ export function Footer() {
             Real estate services are provided by a Maryland-licensed real estate professional. Arthur T Realty is not a mortgage lender or a credit repair organization. Credit repair services are provided by independent licensed partners. Individual results may vary. No specific outcomes are guaranteed. Arthur T Realty is not affiliated with the Maryland Mortgage Program or any government agency.
           </p>
           <p className="text-white/60 text-[11px] font-body" style={{ whiteSpace: 'nowrap' }}>
-            &copy; {new Date().getFullYear()} Arthur T Realty · Powered by <a href="https://init1s.com" target="_blank" rel="noopener" className="text-gold hover:text-gold-light transition-colors">1is</a>
+            &copy; {new Date().getFullYear()} Arthur T Realty · Powered by <a href="https://init1s.com" target="_blank" rel="noopener" className="text-gold underline underline-offset-2 hover:text-gold-light transition-colors">1is</a>
           </p>
         </div>
       </div>

@@ -64,9 +64,43 @@ export function welcome({ cfg, lead }: Ctx): Outreach {
   };
 }
 
+/* ——— Program links ——— */
+
+function stepLink(cfg: AppConfig, phase: PhaseKey): string | undefined {
+  const { links } = cfg;
+  const byPhase: Partial<Record<PhaseKey, string>> = {
+    smart_credit: links.smartCredit,
+    loan_application: links.loanApplication,
+    land_trust: links.landTrust,
+    workshop_registration: links.workshop,
+    counseling_scheduling: links.counselingCalendar,
+  };
+  return byPhase[phase];
+}
+
+const LINK_LATER = ". We'll text you the link as soon as it's ready.";
+
+/**
+ * Until a program link is filled in (config.json holds "TODO: …" placeholders), never send the
+ * placeholder: the text and call say the link is coming, and the email drops its button.
+ */
+export function withoutPlaceholderLink(outreach: Outreach, link: string | undefined): Outreach {
+  if (!link || /^https?:\/\//.test(link)) return outreach;
+  return {
+    ...outreach,
+    call: outreach.call?.replace(/I've texted you (?:the registration link|the link|a link to schedule)\./, "I'll text you the link as soon as it's ready."),
+    sms: outreach.sms?.split(` here: ${link}`).join(LINK_LATER).split(` today: ${link}`).join(` today${LINK_LATER}`).split(`: ${link}`).join(LINK_LATER),
+    email: outreach.email && { ...outreach.email, cta: undefined },
+  };
+}
+
 /* ——— Phases 2–7: first contact when a phase begins ——— */
 
-export function phaseIntro({ cfg, lead }: Ctx, phase: PhaseKey): Outreach {
+export function phaseIntro(ctx: Ctx, phase: PhaseKey): Outreach {
+  return withoutPlaceholderLink(phaseIntroDraft(ctx, phase), stepLink(ctx.cfg, phase));
+}
+
+function phaseIntroDraft({ cfg, lead }: Ctx, phase: PhaseKey): Outreach {
   const name = lead.firstName;
   const { links, rules } = cfg;
   switch (phase) {
@@ -192,7 +226,11 @@ export function phaseIntro({ cfg, lead }: Ctx, phase: PhaseKey): Outreach {
 
 /* ——— Reminders while a phase is waiting ——— */
 
-export function phaseReminder({ cfg, lead }: Ctx, phase: PhaseKey): Outreach {
+export function phaseReminder(ctx: Ctx, phase: PhaseKey): Outreach {
+  return withoutPlaceholderLink(phaseReminderDraft(ctx, phase), stepLink(ctx.cfg, phase));
+}
+
+function phaseReminderDraft({ cfg, lead }: Ctx, phase: PhaseKey): Outreach {
   const name = lead.firstName;
   const { links, rules } = cfg;
   const nudge = (step: string, what: string, url: string, subject: string): Outreach => ({

@@ -59,8 +59,8 @@ Other safeguards:
 1. **Fill in `config.json`**: the five program links, mailing address, staff list, and sender email.
 2. **Email (SES)**: verify the sending domain in SES and request production access (new accounts can only email verified addresses).
 3. **Texting**: in AWS End User Messaging, buy a number and complete 10DLC or toll-free registration (takes 1–3 weeks).
-   Put the number's ARN in `config.json` → `sms.originationIdentity`, and turn on two-way SMS pointing to the
-   `InboundSmsTopicArn` stack output.
+   Once the campaign registration is approved, run `scripts/enable-texting.sh`: it requests the 10DLC number,
+   turns on two-way SMS into the `InboundSmsTopicArn` topic, sets `config.json` → `sms.originationIdentity`, and redeploys.
 4. **AI voice calls**: set `voice.enabled` to `true`. This creates an Amazon Connect instance, claims a phone number, and adds the call flow.
 5. **Staff logins**: create each staff member in the Cognito user pool (`StaffUserPoolId` output).
 6. **Facebook / Google Ads** (optional): put the keys in the `IntegrationSecretName` secret, then point the

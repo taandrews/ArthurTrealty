@@ -66,7 +66,7 @@ export function LeadForm({
     return (
       <div style={{ background: '#FFFFFF', borderRadius: '16px', border: '1px solid #E2E4EA', padding: '40px', textAlign: 'center' }}>
         <CheckCircle2 style={{ width: '44px', height: '44px', color: '#10b981', margin: '0 auto 16px' }} />
-        <h3 className="font-heading font-800 text-navy" style={{ fontSize: '22px', marginBottom: '8px' }}>Thank you!</h3>
+        <h2 className="font-heading font-800 text-navy" style={{ fontSize: '22px', marginBottom: '8px' }}>Thank you!</h2>
         <p className="font-body" style={{ color: '#5A6376', fontSize: '15px', lineHeight: 1.6 }}>
           We received your information. Check your email and phone. Your homeownership assistant will reach out shortly with your first step.
         </p>
@@ -76,7 +76,7 @@ export function LeadForm({
 
   return (
     <form id="get-started" onSubmit={submit} noValidate style={{ scrollMarginTop: '120px', background: '#FFFFFF', borderRadius: '16px', border: '1px solid #E2E4EA', padding: 'clamp(24px, 4vw, 40px)' }}>
-      <h3 className="font-heading font-800 text-navy" style={{ fontSize: '22px', marginBottom: subtitle ? '6px' : '24px' }}>{title}</h3>
+      <h2 className="font-heading font-800 text-navy" style={{ fontSize: '22px', marginBottom: subtitle ? '6px' : '24px' }}>{title}</h2>
       {subtitle && <p className="font-body" style={{ color: '#5A6376', fontSize: '15px', lineHeight: 1.6, marginBottom: '24px' }}>{subtitle}</p>}
       <div className="lead-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
         <div style={{ gridColumn: '1 / -1' }}>

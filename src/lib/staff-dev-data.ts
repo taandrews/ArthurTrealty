@@ -28,16 +28,20 @@ interface DevLead {
   tasks: { id: string; title: string; dueAt: string; assignedTo: string; doneAt?: string }[];
   notes?: string;
   quiz?: Record<string, string>;
+  consent?: { text: string; at: string };
+  journeyRunning?: boolean;
   activity: { at: string; kind: string; channel?: string; summary: string }[];
 }
 
 const coordinator = { name: 'Sample Coordinator', email: 'coordinator@example.com' };
 
+const consented = { text: 'Website form consent (sample)', at: ago(30) };
+
 const leads: DevLead[] = [
   {
     leadId: 'DEV-1', firstName: 'Dana', lastName: 'Sample', phone: '(410) 555-0101', email: 'dana@example.com',
     source: 'website', status: 'active', phase: 'smart_credit', createdAt: ago(2), assignedTo: coordinator,
-    lastResponseAt: ago(1), milestones: {}, funds: {},
+    lastResponseAt: ago(1), milestones: {}, funds: {}, consent: consented, journeyRunning: true,
     tasks: [{ id: 't1', title: 'Call back about Smart Credit questions', dueAt: ago(-1), assignedTo: coordinator.name }],
     quiz: { goal: 'Buy my first home', credit: 'Not sure', timeline: '6–12 months' },
     activity: [
@@ -48,8 +52,8 @@ const leads: DevLead[] = [
   },
   {
     leadId: 'DEV-2', firstName: 'Marcus', lastName: 'Example', phone: '(443) 555-0102',
-    source: 'facebook', status: 'active', phase: 'workshop_attendance', createdAt: ago(21), assignedTo: coordinator,
-    lastResponseAt: ago(3),
+    source: 'google_ads', status: 'active', phase: 'workshop_attendance', createdAt: ago(21), assignedTo: coordinator,
+    lastResponseAt: ago(3), journeyRunning: true,
     milestones: { smart_credit_activated: ago(19), loan_application_submitted: ago(15), land_trust_submitted: ago(10), workshop_registered: ago(5) },
     workshop: { at: new Date(Date.now() + 4 * day).toISOString(), location: 'Online', meetingLink: 'https://example.com/workshop' },
     funds: {}, tasks: [],
@@ -58,7 +62,7 @@ const leads: DevLead[] = [
   {
     leadId: 'DEV-3', firstName: 'Alicia', lastName: 'Placeholder', email: 'alicia@example.com',
     source: 'referral', status: 'active', phase: 'earnest_money', createdAt: ago(60), assignedTo: coordinator,
-    lastResponseAt: ago(16),
+    lastResponseAt: ago(16), consent: consented, journeyRunning: false,
     milestones: {
       smart_credit_activated: ago(58), loan_application_submitted: ago(50), land_trust_submitted: ago(45),
       workshop_registered: ago(40), workshop_attended: ago(33), counseling_scheduled: ago(30), counseling_completed: ago(20),
@@ -69,7 +73,7 @@ const leads: DevLead[] = [
   },
   {
     leadId: 'DEV-4', firstName: 'Terrence', lastName: 'Demo', phone: '(410) 555-0104',
-    source: 'walk_in', status: 'mortgage_ready', createdAt: ago(95), assignedTo: coordinator, lastResponseAt: ago(7),
+    source: 'walk_in', status: 'mortgage_ready', consent: consented, createdAt: ago(95), assignedTo: coordinator, lastResponseAt: ago(7),
     milestones: { counseling_completed: ago(30), funds_ready: ago(7) },
     funds: { hasSaved: true, totalFundsAvailable: 1600 }, tasks: [],
     activity: [{ at: ago(7), kind: 'milestone', summary: 'Upfront funds ready: mortgage-ready' }],
@@ -130,6 +134,17 @@ export async function devStaffApi(path: string, body?: unknown): Promise<unknown
   if (parts[3] === 'funds') {
     Object.assign(lead.funds, body);
     lead.activity.push({ at: now, kind: 'note', summary: 'Funds updated' });
+    return { ok: true };
+  }
+  if (parts[3] === 'consent') {
+    lead.consent = { text: 'Verbal or written consent recorded by you (sample)', at: now };
+    lead.activity.push({ at: now, kind: 'note', summary: 'Consent recorded' });
+    return { ok: true };
+  }
+  if (parts[3] === 'restart') {
+    if (lead.journeyRunning) throw new Error('The journey is already running');
+    lead.journeyRunning = true;
+    lead.activity.push({ at: now, kind: 'note', summary: 'Journey restarted' });
     return { ok: true };
   }
   if (parts[3] === 'tasks' && parts[5] === 'done') {

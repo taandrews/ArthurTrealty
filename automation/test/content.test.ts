@@ -46,8 +46,10 @@ describe('message content', () => {
   });
 
   it('includes the links from config', () => {
-    expect(phaseIntro(ctx, 'smart_credit').sms).toContain(config.links.smartCredit);
-    expect(phaseIntro(ctx, 'counseling_scheduling').email?.cta?.url).toBe(config.links.counselingCalendar);
+    const links = { smartCredit: 'https://example.com/a', loanApplication: 'https://example.com/b', landTrust: 'https://example.com/c', workshop: 'https://example.com/d', counselingCalendar: 'https://example.com/e' };
+    const real = { ...ctx, cfg: { ...config, links } };
+    expect(phaseIntro(real, 'smart_credit').sms).toContain(links.smartCredit);
+    expect(phaseIntro(real, 'counseling_scheduling').email?.cta?.url).toBe(links.counselingCalendar);
   });
 
   it('states the upfront cost target in the earnest money follow-up', () => {
@@ -86,5 +88,29 @@ describe('email rendering', () => {
     expect(html).toContain('Unsubscribe');
     expect(text).toContain('Go: https://e.com/?a=1&b=2');
     expect(text).toContain('1 Main St');
+  });
+});
+
+describe('program link placeholders', () => {
+  const linkPhases = ['smart_credit', 'loan_application', 'land_trust', 'workshop_registration', 'counseling_scheduling'] as const;
+
+  it('never sends a "TODO" placeholder link, and says the link is coming', () => {
+    for (const phase of linkPhases) {
+      for (const o of [phaseIntro(ctx, phase), phaseReminder(ctx, phase)]) {
+        expect(allText(o)).not.toMatch(/TODO/);
+        expect(o.sms).toContain("We'll text you the link as soon as it's ready.");
+        expect(o.sms).not.toMatch(/\.\./);
+        expect(o.email?.cta).toBeUndefined();
+        if (o.call) expect(o.call).not.toContain("I've texted you");
+      }
+    }
+  });
+
+  it('sends real links unchanged', () => {
+    const real = { ...ctx, cfg: { ...config, links: { ...config.links, smartCredit: 'https://example.com/credit' } } };
+    const o = phaseIntro(real, 'smart_credit');
+    expect(o.sms).toContain('here: https://example.com/credit');
+    expect(o.email?.cta?.url).toBe('https://example.com/credit');
+    expect(o.call).toContain("I've texted you");
   });
 });
