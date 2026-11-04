@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { CONTACT_EMAIL, CONTACT_PHONE, LEGAL_UPDATED, LegalPage } from '@/components/page/LegalPage';
+import { LEGAL_UPDATED, LegalPage } from '@/components/page/LegalPage';
 
 export const metadata: Metadata = { title: 'Privacy Policy | Arthur T Realty' };
 
@@ -36,9 +36,9 @@ export default function PrivacyPage() {
         { heading: 'Your Choices', points: [
           'Reply STOP to any text message to stop texts.',
           'Use the unsubscribe link in any email to stop emails.',
-          `Contact us at ${CONTACT_EMAIL} to ask what information we have about you, or to request that we correct or delete it.`,
+          'Send us a message on our Contact page to ask what information we have about you, or to request that we correct or delete it.',
         ] },
-        { heading: 'Contact Us', paragraphs: [`Questions about this policy? Email ${CONTACT_EMAIL} or call ${CONTACT_PHONE}.`] },
+        { heading: 'Contact Us', paragraphs: ['Questions about this policy? Send us a message on our Contact page.'] },
       ]}
     />
   );

@@ -5,7 +5,7 @@ import {
   BadRequestError, NotFoundError, claimOnce, findLeadByEmail, findLeadByPhone, listActivity, logActivity,
   mustGetLead, releaseOnce, scanLeads, updateLead,
 } from '../services/db';
-import { cleanName, createLead, recordMilestone, updateFunds, type MilestoneData } from '../services/journey';
+import { cleanName, createLead, journeyRunning, recordMilestone, restartJourney, updateFunds, type MilestoneData } from '../services/journey';
 import { computeKpis } from '../services/kpis';
 import { notifyManagers, notifyStaff } from '../services/notify';
 import { getSecrets, verifyUnsubscribe } from '../services/secrets';
@@ -43,6 +43,8 @@ const ROUTES: Route[] = [
   ['POST', '/staff/leads/:id/milestones', staffMilestone],
   ['POST', '/staff/leads/:id/funds', staffFunds],
   ['POST', '/staff/leads/:id/tasks/:taskId/done', completeTask],
+  ['POST', '/staff/leads/:id/consent', staffConsent],
+  ['POST', '/staff/leads/:id/restart', staffRestart],
   ['GET', '/staff/kpis', kpis],
 ];
 
@@ -357,7 +359,8 @@ async function staffCreateLead(req: Req) {
 async function getLeadDetail(req: Req) {
   const lead = await mustGetLead(req.params.id);
   const { taskToken, executionArn, ...visible } = lead;
-  return { lead: visible, activity: await listActivity(lead.leadId) };
+  const running = lead.status === 'active' ? await journeyRunning(lead) : undefined;
+  return { lead: { ...visible, journeyRunning: running }, activity: await listActivity(lead.leadId) };
 }
 
 async function staffMilestone(req: Req) {
@@ -382,6 +385,22 @@ async function staffFunds(req: Req) {
   };
   for (const k of Object.keys(changes) as (keyof Funds)[]) if (changes[k] === undefined) delete changes[k];
   await updateFunds(req.params.id, changes, staffName(req));
+  return { ok: true };
+}
+
+/** Record consent a client gave staff in person or by phone (e.g. a Google lead that came in without it). */
+async function staffConsent(req: Req) {
+  if (req.body.consent !== true) throw new BadRequestError('Confirm the client agreed to automated calls, texts, and emails');
+  const lead = await mustGetLead(req.params.id);
+  if (lead.consent) return { ok: true, already: true };
+  const by = staffName(req);
+  await updateLead(lead.leadId, { consent: { text: `Verbal or written consent recorded by ${by}`, at: nowIso() } });
+  await logActivity({ leadId: lead.leadId, kind: 'note', summary: `Consent recorded by ${by}` });
+  return { ok: true };
+}
+
+async function staffRestart(req: Req) {
+  await restartJourney(req.params.id, staffName(req));
   return { ok: true };
 }
 

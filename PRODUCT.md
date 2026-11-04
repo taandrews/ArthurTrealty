@@ -42,7 +42,7 @@ Arthur T Realty is a Maryland real estate business that turns inquiries into hom
 - Every lead form requires consent to automated and AI-generated calls, texts, and emails (TCPA). Consent wording lives in `src/lib/consent.ts`.
 - Real estate services are provided by a Maryland-licensed real estate professional. Arthur T Realty is not a mortgage lender or credit repair organization; credit restoration is through independent licensed partners. Rent-to-own and credit pages carry required disclaimers.
 - **Open decisions / placeholders (do not present as final):**
-  - Phone number on the site is a placeholder: (443) 555-1234.
+  - No phone number or email is shown on the site until real ones are provided; visitors use the Contact form.
   - Calling number must be a Maryland 410/443 number (currently a temporary Texas test number; AWS request pending).
   - Arthur's license number: not yet provided.
   - Business address: never advertised. Do not put the business's street address on the site, in messages, or in emails. If a published mailing address is ever legally required (e.g. marketing email), use a P.O. box the owner provides.

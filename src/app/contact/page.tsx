@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Mail, MapPin, Phone } from 'lucide-react';
+import { MapPin } from 'lucide-react';
 import { PageHero, Section } from '@/components/page/PageParts';
 import { LeadForm } from '@/components/page/LeadForm';
 import { SERVICE_OPTIONS } from '@/data/services';
@@ -10,9 +10,7 @@ export const metadata: Metadata = {
 };
 
 const contactItems = [
-  { icon: Phone, label: 'Phone', value: '(443) 555-1234', href: 'tel:4435551234' },
-  { icon: Mail, label: 'Email', value: 'info@arthurtrealty.com', href: 'mailto:info@arthurtrealty.com' },
-  { icon: MapPin, label: 'Service area', value: 'All of Maryland: 23 counties and Baltimore City' },
+  { icon: MapPin, label: 'Service area', value: 'All of Maryland: 23 counties and Baltimore City', href: undefined as string | undefined },
 ];
 
 export default function ContactPage() {

@@ -1,4 +1,4 @@
-import { SFNClient, SendTaskFailureCommand, SendTaskSuccessCommand, StartExecutionCommand, StopExecutionCommand } from '@aws-sdk/client-sfn';
+import { DescribeExecutionCommand, SFNClient, SendTaskFailureCommand, SendTaskSuccessCommand, StartExecutionCommand, StopExecutionCommand } from '@aws-sdk/client-sfn';
 import { randomUUID } from 'node:crypto';
 import { env, getConfig } from '../config';
 import { WORKSHOP_REMINDERS } from '../content/messages';
@@ -113,13 +113,43 @@ export async function createLead(input: NewLeadInput): Promise<Lead> {
   return saved;
 }
 
+/** Whether the client's journey is running (undefined if it can't be checked). */
+export async function journeyRunning(lead: Lead): Promise<boolean | undefined> {
+  if (!lead.executionArn) return false;
+  try {
+    const { status } = await sfn.send(new DescribeExecutionCommand({ executionArn: lead.executionArn }));
+    return status === 'RUNNING';
+  } catch (err) {
+    console.error(`Checking the journey for ${lead.leadId} failed`, err);
+    return undefined;
+  }
+}
+
+/**
+ * Restart an active client's journey after it stopped (error, or it never started). Steps the client
+ * already completed are skipped, and the welcome isn't sent twice while its marker lasts.
+ */
+export async function restartJourney(leadId: string, by: string): Promise<Lead> {
+  const lead = await mustGetLead(leadId);
+  if (lead.status !== 'active') throw new BadRequestError(`This client's journey is finished (${lead.status})`);
+  if (lead.executionArn) {
+    const { status } = await sfn.send(new DescribeExecutionCommand({ executionArn: lead.executionArn }));
+    if (status === 'RUNNING') throw new BadRequestError('The journey is already running');
+  }
+  const executionArn = await startJourney(leadId, `${leadId}-r${Date.now()}`);
+  if (!executionArn) throw new Error('The journey could not be started. Try again in a minute.');
+  const updated = await updateLead(leadId, { executionArn }, { remove: ['taskToken'] });
+  await logActivity({ leadId, kind: 'note', summary: `Journey restarted by ${by}` });
+  return updated;
+}
+
 /** Start the journey, retrying briefly. Same name + input is idempotent, so a retry can't start it twice. */
-async function startJourney(leadId: string): Promise<string | undefined> {
+async function startJourney(leadId: string, name = leadId): Promise<string | undefined> {
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
       const exec = await sfn.send(new StartExecutionCommand({
         stateMachineArn: env.stateMachineArn,
-        name: leadId,
+        name,
         input: JSON.stringify({ leadId }),
       }));
       return exec.executionArn;

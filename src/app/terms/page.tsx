@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { CONTACT_EMAIL, LEGAL_UPDATED, LegalPage } from '@/components/page/LegalPage';
+import { LEGAL_UPDATED, LegalPage } from '@/components/page/LegalPage';
 
 export const metadata: Metadata = { title: 'Terms of Service | Arthur T Realty' };
 
@@ -30,7 +30,7 @@ export default function TermsPage() {
         ] },
         { heading: 'Governing Law', paragraphs: ['These terms are governed by the laws of the State of Maryland.'] },
         { heading: 'Changes', paragraphs: ['We may update these terms from time to time. The “Last updated” date shows when they last changed.'] },
-        { heading: 'Contact', paragraphs: [`Questions? Email ${CONTACT_EMAIL}.`] },
+        { heading: 'Contact', paragraphs: ['Questions? Send us a message on our Contact page.'] },
       ]}
     />
   );

@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Phone, Mail } from 'lucide-react';
+import { Mail } from 'lucide-react';
 
 // Short labels keep the footer compact; the navbar uses the full service names.
 const serviceLinks = [
@@ -59,12 +59,9 @@ export function Footer() {
               <img src="/logo-arthur-t-realty-white.png" alt="Arthur T Realty" style={{ height: '46px', width: 'auto', opacity: 0.9 }} />
             </Link>
             <div className="flex flex-col" style={{ rowGap: '2px', lineHeight: 1.35 }}>
-              <a href="tel:4435551234" className={`flex items-center ${linkClass}`} style={{ gap: '8px' }}>
-                <Phone className="w-3.5 h-3.5 text-gold" /> (443) 555-1234
-              </a>
-              <a href="mailto:info@arthurtrealty.com" className={`flex items-center ${linkClass}`} style={{ gap: '8px' }}>
-                <Mail className="w-3.5 h-3.5 text-gold" /> info@arthurtrealty.com
-              </a>
+              <Link href="/contact/" className={`flex items-center ${linkClass}`} style={{ gap: '8px' }}>
+                <Mail className="w-3.5 h-3.5 text-gold" /> Send us a message
+              </Link>
             </div>
           </div>
 

@@ -176,7 +176,7 @@ export class ArthurTRealtyStack extends Stack {
       }));
       f.addToRolePolicy(new iam.PolicyStatement({ actions: ['iam:PassRole'], resources: [schedulerRole.roleArn] }));
       f.addToRolePolicy(new iam.PolicyStatement({
-        actions: ['states:StartExecution', 'states:SendTaskSuccess', 'states:SendTaskFailure', 'states:StopExecution'],
+        actions: ['states:StartExecution', 'states:SendTaskSuccess', 'states:SendTaskFailure', 'states:StopExecution', 'states:DescribeExecution'],
         resources: [stateMachineArn, executionsArn],
       }));
       // AI calls go through Amazon Connect in the voice region; its IDs are read from an SSM parameter there.

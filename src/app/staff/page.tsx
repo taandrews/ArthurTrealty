@@ -26,6 +26,7 @@ interface LeadDetail {
   funds: Record<string, number | string | boolean | undefined>;
   tasks: Task[]; notes?: string; quiz?: Record<string, string>;
   smsOptOut?: boolean; emailOptOut?: boolean; callOptOut?: boolean;
+  consent?: { text: string; at: string }; journeyRunning?: boolean;
 }
 interface Activity { at: string; kind: string; channel?: string; summary: string }
 type Kpis = Record<string, number | null | string | Record<string, number> | undefined>;
@@ -444,6 +445,32 @@ function LeadPanel({ leadId, api, onClose, onChanged }: { leadId: string; api: A
               <div><span className="text-gray-400">Step / status</span><br /><span className="capitalize">{label(lead.phase)} · {label(lead.status)}</span></div>
             </div>
             {lead.notes && <p className="rounded-lg bg-[#F5F6FA] p-3 text-gray-700">{lead.notes}</p>}
+
+            {!lead.consent && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-900">
+                <p><strong>No consent on record.</strong> The assistant can&apos;t call, text, or email this client.</p>
+                <button
+                  disabled={busy}
+                  onClick={() => { if (window.confirm(`Confirm ${lead.firstName} agreed to automated and AI calls, texts, and emails from Arthur T Realty.`)) act(() => api(`/staff/leads/${leadId}/consent`, { consent: true })); }}
+                  className="mt-2 rounded bg-[#0A1F44] px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+                >
+                  Client agreed: record consent
+                </button>
+              </div>
+            )}
+
+            {lead.status === 'active' && lead.journeyRunning === false && (
+              <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-red-900">
+                <p><strong>The assistant has stopped for this client.</strong> No calls or texts are going out.</p>
+                <button
+                  disabled={busy}
+                  onClick={() => act(() => api(`/staff/leads/${leadId}/restart`, {}))}
+                  className="mt-2 rounded bg-[#0A1F44] px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+                >
+                  Restart the assistant
+                </button>
+              </div>
+            )}
 
             <Block title="Milestones">
               <div className="space-y-2">

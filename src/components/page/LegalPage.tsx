@@ -38,5 +38,3 @@ export function LegalPage({ title, updated, intro, sections }: { title: string; 
 }
 
 export const LEGAL_UPDATED = 'October 29, 2026';
-export const CONTACT_EMAIL = 'info@arthurtrealty.com';
-export const CONTACT_PHONE = '(443) 555-1234';
