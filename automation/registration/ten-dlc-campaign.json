@@ -1,9 +1,9 @@
 {
-  "_about": "US 10DLC campaign registration for AWS End User Messaging (registration type US_TEN_DLC_CAMPAIGN_REGISTRATION). Field paths match `aws pinpoint-sms-voice-v2 describe-registration-field-definitions`. Draft created in AWS as registration-8f023613e21c4a299b1f96a9cc43c4b9 (us-east-2, with opt-in screenshot attached); link it to the brand and submit after the brand registration (ten-dlc-brand.json) is approved.",
+  "_about": "US 10DLC campaign registration for AWS End User Messaging (registration type US_TEN_DLC_CAMPAIGN_REGISTRATION). Field paths match `aws pinpoint-sms-voice-v2 describe-registration-field-definitions`. Submitted 2026-11-04 as registration-8f023613e21c4a299b1f96a9cc43c4b9 (us-east-2, low-volume, linked to the approved brand, opt-in screenshot attached). When approved, run scripts/enable-texting.sh.",
   "fields": {
     "campaignInfo.campaignName": "Arthur T Realty homeownership program: automated texts to Maryland clients who opted in on our website. Texts give each client their next program step (credit monitoring, mortgage application, Land Trust application, homeownership workshop, counseling), links to complete each step, appointment reminders, savings check-ins, and answers to their questions from our AI homeownership assistant.",
     "campaignInfo.vertical": "REAL_ESTATE",
-    "campaignUseCase.useCase": "MIXED",
+    "campaignUseCase.useCase": "LOW_VOLUME",
     "campaignUseCase.subUseCases": [
       "ACCOUNT_NOTIFICATION",
       "CUSTOMER_CARE"
