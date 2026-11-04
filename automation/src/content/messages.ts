@@ -40,9 +40,8 @@ export function welcome({ cfg, lead }: Ctx): Outreach {
       `If you have questions at any time, just ask me on any call. ` +
       `Let's begin with your first step. Do you have any questions before we get started?`,
     sms:
-      `Hi ${name}! Welcome to ${cfg.brandName}. We're excited to help you become a homeowner. ` +
-      `Your homeownership assistant will guide you through each step until you're ready to purchase your home. ` +
-      `Text us any question anytime. Reply STOP to opt out.`,
+      `Hi ${name}! Welcome to ${cfg.brandName}. Your homeownership assistant will guide you step by step until you're ready to buy your home. ` +
+      `Text us any question. Msg frequency varies. Msg & data rates may apply. Reply HELP for help, STOP to opt out.`,
     email: {
       subject: `Welcome to ${cfg.brandName}, ${name}`,
       paragraphs: [

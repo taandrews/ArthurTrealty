@@ -1,5 +1,5 @@
 import type { SNSEvent } from 'aws-lambda';
-import { getConfig } from '../config';
+import { env, getConfig } from '../config';
 import { detectOptOut, type OptOut } from '../lib/opt-out';
 import { toE164 } from '../lib/phone';
 import { localDate, nowIso } from '../lib/time';
@@ -77,7 +77,7 @@ async function handleText(msg: InboundSms): Promise<void> {
 
   if (keyword === 'HELP') {
     const { brandName } = getConfig();
-    await sendSms(updated, `${brandName}: your homeownership assistant. Text your question anytime and we'll help. Msg & data rates may apply. Reply STOP to opt out.`, 'HELP reply', { immediate: true });
+    await sendSms(updated, `${brandName}: your homeownership assistant. Text your question anytime and we'll help${env.siteUrl ? `, or message us at ${env.siteUrl}/contact/` : ''}. Msg & data rates may apply. Reply STOP to opt out.`, 'HELP reply', { immediate: true });
     return;
   }
   if (keyword === 'UPDATE') {

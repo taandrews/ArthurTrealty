@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { CONTACT_EMAIL, CONTACT_PHONE, LEGAL_UPDATED, LegalPage } from '@/components/page/LegalPage';
+import { LEGAL_UPDATED, LegalPage } from '@/components/page/LegalPage';
 
 export const metadata: Metadata = { title: 'SMS Terms | Arthur T Realty' };
 
@@ -24,7 +24,7 @@ export default function SmsTermsPage() {
           'Reply STOP to any message at any time to stop receiving texts. You will receive one final message confirming you have been unsubscribed. Reply START to opt back in.',
         ] },
         { heading: 'Help', paragraphs: [
-          `Reply HELP to any message for assistance, email ${CONTACT_EMAIL}, or call ${CONTACT_PHONE}.`,
+          'Reply HELP to any message for assistance, text us your question, or send us a message on our Contact page.',
         ] },
         { heading: 'Carriers', paragraphs: ['Mobile carriers are not liable for delayed or undelivered messages.'] },
         { heading: 'Privacy', paragraphs: [
